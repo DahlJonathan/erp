@@ -36,6 +36,28 @@ import type {
 
 type AppView = 'dashboard' | 'tracker' | 'management' | 'history'
 
+function getNextInvoiceNumber(existingInvoices: Invoice[], invoiceDate: string) {
+  const year = invoiceDate.slice(0, 4)
+  const yearPrefix = `${year}-`
+
+  const latestSequence = existingInvoices.reduce((maxSequence, invoice) => {
+    if (!invoice.invoiceNumber.startsWith(yearPrefix)) {
+      return maxSequence
+    }
+
+    const sequencePart = invoice.invoiceNumber.slice(yearPrefix.length)
+    const parsedSequence = Number(sequencePart)
+
+    if (!Number.isInteger(parsedSequence) || parsedSequence < 0) {
+      return maxSequence
+    }
+
+    return Math.max(maxSequence, parsedSequence)
+  }, 0)
+
+  return `${yearPrefix}${String(latestSequence + 1).padStart(3, '0')}`
+}
+
 function App() {
   const [activeView, setActiveView] = useState<AppView>('dashboard')
   const [clients, setClients] = useState<Client[]>([])
@@ -130,6 +152,52 @@ function App() {
     setProjects((currentProjects) => [mapProjectRow(data as ProjectRow), ...currentProjects])
   }
 
+  async function handleUpdateProject(
+    projectId: string,
+    updatedData: Pick<Project, 'name' | 'hourlyRate' | 'budgetHours' | 'status'>,
+  ) {
+    const { data, error } = await supabase
+      .from('projects')
+      .update({
+        name: updatedData.name,
+        hourly_rate: updatedData.hourlyRate,
+        budget_hours: updatedData.budgetHours,
+        status: updatedData.status,
+      })
+      .eq('id', projectId)
+      .select('*')
+      .single()
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    const updatedProject = mapProjectRow(data as ProjectRow)
+    setProjects((currentProjects) =>
+      currentProjects.map((project) =>
+        project.id === projectId ? updatedProject : project,
+      ),
+    )
+  }
+
+  async function handleDeleteProject(projectId: string) {
+    const { error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', projectId)
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    setProjects((currentProjects) =>
+      currentProjects.filter((project) => project.id !== projectId),
+    )
+    setTimeEntries((currentEntries) =>
+      currentEntries.filter((entry) => entry.projectId !== projectId),
+    )
+  }
+
   async function handleAddClient(client: NewClient) {
     const { data, error } = await supabase
       .from('clients')
@@ -171,10 +239,12 @@ function App() {
   }
 
   async function handleGenerateInvoice(clientId: string, entryIds: string[], totalAmount: number) {
+    const invoiceDate = getTodayIsoDate()
+
     const invoiceDraft: Omit<Invoice, 'id'> = {
       clientId,
-      invoiceNumber: `LASKU-${Date.now()}`,
-      date: getTodayIsoDate(),
+      invoiceNumber: getNextInvoiceNumber(invoices, invoiceDate),
+      date: invoiceDate,
       totalAmount,
       status: 'draft',
     }
@@ -230,6 +300,8 @@ function App() {
             projects={projects}
             isLoading={isDataLoading}
             errorMessage={dataError}
+            onUpdateProject={handleUpdateProject}
+            onDeleteProject={handleDeleteProject}
           />
           <TimeTracker
             clients={clients}

@@ -1,9 +1,32 @@
 import { useMemo, useState } from 'react'
+import { createRoot } from 'react-dom/client'
 
-import { InvoiceTemplate } from './InvoiceTemplate'
+import { InvoicePrintView } from './InvoicePrintView'
 
 import type { Client, Invoice, Project, TimeEntry } from '../types/types'
 import { formatFinnishDate } from '../utils/date'
+
+const printWindowStyles = `
+    @page {
+        size: A4;
+        margin: 0;
+    }
+
+    html, body {
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+    }
+
+    body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+`
 
 type InvoicePreview = {
     invoice: Invoice
@@ -136,7 +159,54 @@ export function InvoicingView({
     }
 
     function handlePrintInvoice() {
-        window.print()
+        if (!persistedPreview) {
+            return
+        }
+
+        const printWindow = window.open('', '_blank', 'popup=yes,width=1080,height=900')
+
+        if (!printWindow) {
+            setSaveError('Tulostusikkunan avaaminen estettiin selaimessa.')
+            return
+        }
+
+        const activePrintWindow: Window = printWindow
+
+        const printDocument = activePrintWindow.document
+        printDocument.documentElement.lang = 'fi'
+        printDocument.title = `Lasku ${persistedPreview.invoice.invoiceNumber}`
+        printDocument.head.innerHTML = `<meta charset="utf-8" /><title>Lasku ${persistedPreview.invoice.invoiceNumber}</title><style>${printWindowStyles}</style>`
+        printDocument.body.innerHTML = '<div id="invoice-print-root"></div>'
+
+        const printRootElement = printDocument.getElementById('invoice-print-root')
+
+        if (!printRootElement) {
+            setSaveError('Tulostusnäkymän luonti epäonnistui.')
+            activePrintWindow.close()
+            return
+        }
+
+        const printRoot = createRoot(printRootElement)
+        const logoSrc = new URL('/lasku.png', window.location.origin).toString()
+
+        function triggerPrint() {
+            if (activePrintWindow.closed) {
+                return
+            }
+
+            activePrintWindow.focus()
+            activePrintWindow.print()
+        }
+
+        printRoot.render(
+            <InvoicePrintView
+                invoice={persistedPreview.invoice}
+                client={persistedPreview.client}
+                lines={persistedPreview.lines}
+                logoSrc={logoSrc}
+                onReady={triggerPrint}
+            />,
+        )
     }
 
     const persistedPreview = useMemo(() => {
@@ -153,6 +223,7 @@ export function InvoicingView({
                 return project
                     ? {
                         entryId: entry.id,
+                        projectName: project.name,
                         description: entry.description,
                         duration: entry.duration,
                         hourlyRate: project.hourlyRate,
@@ -165,6 +236,7 @@ export function InvoicingView({
         return {
             invoice: persistedInvoice,
             client: invoicePreview.client,
+            totalHours: invoicePreview.totalHours,
             lines: persistedLines.length > 0 ? persistedLines : invoicePreview.lines,
         }
     }, [invoiceById, invoicePreview, projectById, timeEntries])
@@ -254,7 +326,7 @@ export function InvoicingView({
                 <aside className="rounded-3xl border-2 border-slate-400 bg-slate-50 p-5 shadow-sm shadow-slate-300/60">
                     <div className="screen-only flex items-center justify-between gap-4">
                         <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                            Laskun esikatselu
+                            Laskun vienti
                         </p>
                         {persistedPreview ? (
                             <button
@@ -262,22 +334,46 @@ export function InvoicingView({
                                 onClick={handlePrintInvoice}
                                 className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
                             >
-                                Lataa PDF / Tulosta
+                                Lataa PDF
                             </button>
                         ) : null}
                     </div>
 
                     {persistedPreview ? (
-                        <div className="mt-5">
-                            <InvoiceTemplate
-                                invoice={persistedPreview.invoice}
-                                client={persistedPreview.client}
-                                lines={persistedPreview.lines}
-                            />
+                        <div className="mt-5 space-y-4 rounded-2xl border-2 border-slate-400 bg-white p-5 text-sm text-slate-700">
+                            <div>
+                                <p className="text-lg font-semibold text-slate-950">Lasku on valmis vietäväksi</p>
+                                <p className="mt-1 text-slate-600">
+                                    Lasku avataan uuteen ikkunaan A4-muodossa ja tulostus käynnistyy automaattisesti.
+                                </p>
+                            </div>
+
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="rounded-2xl border-2 border-slate-300 bg-slate-50 px-4 py-3">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Laskun numero</p>
+                                    <p className="mt-2 font-semibold text-slate-950">{persistedPreview.invoice.invoiceNumber}</p>
+                                </div>
+                                <div className="rounded-2xl border-2 border-slate-300 bg-slate-50 px-4 py-3">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Päiväys</p>
+                                    <p className="mt-2 font-semibold text-slate-950">{formatFinnishDate(persistedPreview.invoice.date)}</p>
+                                </div>
+                                <div className="rounded-2xl border-2 border-slate-300 bg-slate-50 px-4 py-3">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Asiakas</p>
+                                    <p className="mt-2 font-semibold text-slate-950">{persistedPreview.client.name}</p>
+                                </div>
+                                <div className="rounded-2xl border-2 border-slate-300 bg-slate-50 px-4 py-3">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Laskutettava yhteensä</p>
+                                    <p className="mt-2 font-semibold text-slate-950">{(persistedPreview.invoice.totalAmount * 1.255).toFixed(2)} EUR</p>
+                                </div>
+                            </div>
+
+                            <div className="rounded-2xl border-2 border-dashed border-slate-400 bg-slate-50 px-4 py-3 text-slate-700">
+                                Dokumenttiin ei lisätä ERP-näkymän otsikoita, painikkeita tai muuta käyttöliittymää.
+                            </div>
                         </div>
                     ) : (
                         <div className="mt-5 rounded-2xl border-2 border-dashed border-slate-500 bg-white p-5 text-sm text-slate-700">
-                            Luo lasku asiakkaalle, niin esikatselu näytetään tässä.
+                            Luo lasku asiakkaalle, niin PDF-vienti voidaan avata uuteen ikkunaan.
                         </div>
                     )}
                 </aside>

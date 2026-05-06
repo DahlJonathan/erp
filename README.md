@@ -1,73 +1,115 @@
-# React + TypeScript + Vite
+# ERP
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Small ERP-style web app for managing clients, projects, time entries, approvals, invoicing, and historical reporting.
 
-Currently, two official plugins are available:
+The frontend is built with React, TypeScript, and Vite. Data is loaded from Supabase and written back directly from the UI.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## What It Does
 
-## React Compiler
+- Track clients and their billing details.
+- Create and manage projects with hourly rates, budgets, and statuses.
+- Log billable time entries.
+- Approve work entries before invoicing.
+- Generate invoice drafts from approved work.
+- Review project, invoice, and time-entry history.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The main UI is split into four views:
 
-## Expanding the ESLint configuration
+- `Yhteenveto` for dashboard metrics
+- `Seuranta` for project and time tracking
+- `Hallinta` for approvals and invoicing
+- `Historia` for historical review
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Tech Stack
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- React 19
+- TypeScript
+- Vite
+- Supabase JavaScript client
+- Tailwind CSS 4
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Requirements
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- Node.js 20+
+- npm 10+
+- A Supabase project with the required tables
+
+## Getting Started
+
+1. Install dependencies:
+
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. Create a `.env` file in the project root with your Supabase credentials:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
+
+3. Make sure your Supabase database schema is up to date.
+
+This repository currently includes the migration below for client billing fields:
+
+- `supabase/migrations/20260505_add_client_billing_fields.sql`
+
+If the base schema is not already present in your Supabase project, create the required tables first before applying the migration.
+
+4. Start the development server:
+
+```bash
+npm run dev
+```
+
+The app will be available at the local Vite development URL, typically `http://localhost:5173`.
+
+## Available Scripts
+
+```bash
+npm run dev
+npm run build
+npm run lint
+npm run preview
+```
+
+## Data Model Overview
+
+The app works primarily with four entities:
+
+- `clients`
+- `projects`
+- `time_entries`
+- `invoices`
+
+At the TypeScript level these are defined in `src/types/types.ts`, and Supabase row-to-app mapping logic lives in `src/data/supabaseMappers.ts`.
+
+## Project Structure
+
+```text
+src/
+  components/        UI views for dashboard, tracking, approvals, invoicing, and history
+  data/              Supabase row mapping helpers
+  types/             Shared TypeScript domain types
+  utils/             Small utility helpers
+  supabaseClient.ts  Supabase client initialization
+supabase/
+  migrations/        SQL migrations
+```
+
+## Notes
+
+- The app fails fast if `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` is missing.
+- Supabase access is initialized in `src/supabaseClient.ts`.
+- The current implementation loads clients, projects, time entries, and invoices on app startup.
+
+## Build
+
+Production build:
+
+```bash
+npm run build
+```
+
+This runs TypeScript project builds first and then creates the Vite production bundle.

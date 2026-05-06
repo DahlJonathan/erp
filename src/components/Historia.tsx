@@ -1,9 +1,32 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
+import { createRoot } from 'react-dom/client'
 
-import { InvoiceTemplate } from './InvoiceTemplate'
+import { InvoicePrintView } from './InvoicePrintView'
 
 import type { Client, Invoice, Project, ProjectStatus, TimeEntry } from '../types/types'
 import { formatFinnishDate } from '../utils/date'
+
+const printWindowStyles = `
+    @page {
+        size: A4;
+        margin: 0;
+    }
+
+    html, body {
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+    }
+
+    body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+`
 
 type HistoriaProps = {
     clients: Client[]
@@ -28,8 +51,6 @@ const invoiceStatusLabels = {
 } as const
 
 export function Historia({ clients, invoices, projects, timeEntries }: HistoriaProps) {
-    const [previewInvoiceId, setPreviewInvoiceId] = useState<string | null>(invoices[0]?.id ?? null)
-
     const clientById = useMemo(
         () => new Map(clients.map((client) => [client.id, client])),
         [clients],
@@ -68,19 +89,15 @@ export function Historia({ clients, invoices, projects, timeEntries }: HistoriaP
         [clientById, invoices],
     )
 
-    const previewInvoice = useMemo(
-        () => invoices.find((invoice) => invoice.id === previewInvoiceId) ?? null,
-        [invoices, previewInvoiceId],
-    )
+    function handlePreviewInvoice(invoice: Invoice) {
+        const previewClient = clientById.get(invoice.clientId)
 
-    const previewClient = previewInvoice ? clientById.get(previewInvoice.clientId) ?? null : null
-    const previewLines = useMemo(() => {
-        if (!previewInvoice) {
-            return []
+        if (!previewClient) {
+            return
         }
 
-        return timeEntries
-            .filter((entry) => entry.invoiceId === previewInvoice.id)
+        const previewLines = timeEntries
+            .filter((entry) => entry.invoiceId === invoice.id)
             .map((entry) => {
                 const project = projectById.get(entry.projectId)
                 if (!project) {
@@ -89,14 +106,58 @@ export function Historia({ clients, invoices, projects, timeEntries }: HistoriaP
 
                 return {
                     entryId: entry.id,
-                    description: `${project.name}: ${entry.description}`,
+                    projectName: project.name,
+                    description: entry.description,
                     duration: entry.duration,
                     hourlyRate: project.hourlyRate,
                     lineTotal: entry.duration * project.hourlyRate,
                 }
             })
             .filter((line): line is NonNullable<typeof line> => line !== null)
-    }, [previewInvoice, projectById, timeEntries])
+
+        const printWindow = window.open('', '_blank', 'popup=yes,width=1080,height=900')
+
+        if (!printWindow) {
+            return
+        }
+
+        const activePrintWindow: Window = printWindow
+        const printDocument = activePrintWindow.document
+
+        printDocument.documentElement.lang = 'fi'
+        printDocument.title = `Lasku ${invoice.invoiceNumber}`
+        printDocument.head.innerHTML = `<meta charset="utf-8" /><title>Lasku ${invoice.invoiceNumber}</title><style>${printWindowStyles}</style>`
+        printDocument.body.innerHTML = '<div id="invoice-print-root"></div>'
+
+        const printRootElement = printDocument.getElementById('invoice-print-root')
+
+        if (!printRootElement) {
+            activePrintWindow.close()
+            return
+        }
+
+        const printRoot = createRoot(printRootElement)
+        const logoSrc = new URL('/lasku.png', window.location.origin).toString()
+
+        function triggerPrint() {
+            if (activePrintWindow.closed) {
+                return
+            }
+
+            activePrintWindow.focus()
+            activePrintWindow.print()
+        }
+
+        printRoot.render(
+            <InvoicePrintView
+                invoice={invoice}
+                client={previewClient}
+                lines={previewLines}
+                logoSrc={logoSrc}
+                onReady={triggerPrint}
+            />,
+        )
+    }
 
     return (
         <section className="rounded-3xl border-2 border-slate-400 bg-white/95 p-6 shadow-sm shadow-slate-300/60">
@@ -112,157 +173,143 @@ export function Historia({ clients, invoices, projects, timeEntries }: HistoriaP
                 </p>
             </div>
 
-            <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-                <div className="space-y-8">
-                    <article className="rounded-3xl border-2 border-slate-400 bg-slate-50 p-5">
-                        <div className="flex items-end justify-between gap-4 border-b-2 border-slate-300 pb-4">
-                            <div>
-                                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                                    Menneet projektit
-                                </p>
-                                <h3 className="mt-2 text-xl font-semibold text-slate-950">
-                                    Valmistuneet ja arkistoidut projektit
-                                </h3>
-                            </div>
-                            <div className="rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-right">
-                                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Projektit</p>
-                                <p className="mt-1 text-2xl font-semibold text-slate-950">{projectHistory.length}</p>
-                            </div>
+            <div className="mt-8 space-y-8">
+                <article className="rounded-3xl border-2 border-slate-400 bg-slate-50 p-5">
+                    <div className="flex items-end justify-between gap-4 border-b-2 border-slate-300 pb-4">
+                        <div>
+                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                                Menneet projektit
+                            </p>
+                            <h3 className="mt-2 text-xl font-semibold text-slate-950">
+                                Valmistuneet ja arkistoidut projektit
+                            </h3>
                         </div>
+                        <div className="rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-right">
+                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Projektit</p>
+                            <p className="mt-1 text-2xl font-semibold text-slate-950">{projectHistory.length}</p>
+                        </div>
+                    </div>
 
-                        {projectHistory.length === 0 ? (
-                            <div className="mt-5 rounded-2xl border-2 border-dashed border-slate-500 bg-white p-5 text-sm text-slate-700">
-                                Ei vielä valmistuneita tai arkistoituja projekteja.
-                            </div>
-                        ) : (
-                            <div className="mt-5 divide-y-2 divide-slate-300 overflow-hidden rounded-2xl border-2 border-slate-400 bg-white">
-                                {projectHistory.map(({ project, client, totalHours }) => {
-                                    const isOverBudget = totalHours > project.budgetHours
+                    {projectHistory.length === 0 ? (
+                        <div className="mt-5 rounded-2xl border-2 border-dashed border-slate-500 bg-white p-5 text-sm text-slate-700">
+                            Ei vielä valmistuneita tai arkistoituja projekteja.
+                        </div>
+                    ) : (
+                        <div className="mt-5 divide-y-2 divide-slate-300 overflow-hidden rounded-2xl border-2 border-slate-400 bg-white">
+                            {projectHistory.map(({ project, client, totalHours }) => {
+                                const isOverBudget = totalHours > project.budgetHours
 
-                                    return (
-                                        <div key={project.id} className="grid gap-4 px-5 py-4 md:grid-cols-[minmax(0,1.6fr)_140px_140px_140px] md:items-center">
-                                            <div>
-                                                <p className="text-base font-semibold text-slate-950">{project.name}</p>
-                                                <p className="mt-1 text-sm text-slate-700">
-                                                    {client?.name ?? 'Tuntematon asiakas'}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tila</p>
-                                                <p className="mt-1 font-medium text-slate-950">
-                                                    {projectStatusLabels[project.status]}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tunnit / budjetti</p>
-                                                <p className="mt-1 font-medium text-slate-950">
-                                                    {totalHours.toFixed(1)} h / {project.budgetHours.toFixed(1)} h
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <span className={`inline-flex rounded-full border px-3 py-1 text-sm font-medium ${isOverBudget
-                                                    ? 'border-rose-400 bg-rose-100 text-rose-800'
-                                                    : 'border-emerald-400 bg-emerald-100 text-emerald-800'
-                                                    }`}>
-                                                    {isOverBudget ? 'Yli budjetin' : 'Budjetissa'}
-                                                </span>
-                                            </div>
+                                return (
+                                    <div key={project.id} className="grid gap-4 px-5 py-4 md:grid-cols-[minmax(0,1.6fr)_140px_140px_140px] md:items-center">
+                                        <div>
+                                            <p className="text-base font-semibold text-slate-950">{project.name}</p>
+                                            <p className="mt-1 text-sm text-slate-700">
+                                                {client?.name ?? 'Tuntematon asiakas'}
+                                            </p>
                                         </div>
-                                    )
-                                })}
-                            </div>
-                        )}
-                    </article>
-
-                    <article className="rounded-3xl border-2 border-slate-400 bg-slate-50 p-5">
-                        <div className="flex items-end justify-between gap-4 border-b-2 border-slate-300 pb-4">
-                            <div>
-                                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                                    Laskuhistoria
-                                </p>
-                                <h3 className="mt-2 text-xl font-semibold text-slate-950">
-                                    Tallennetut laskut
-                                </h3>
-                            </div>
-                            <div className="rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-right">
-                                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Laskut</p>
-                                <p className="mt-1 text-2xl font-semibold text-slate-950">{invoiceHistory.length}</p>
-                            </div>
+                                        <div>
+                                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tila</p>
+                                            <p className="mt-1 font-medium text-slate-950">
+                                                {projectStatusLabels[project.status]}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tunnit / budjetti</p>
+                                            <p className="mt-1 font-medium text-slate-950">
+                                                {totalHours.toFixed(1)} h / {project.budgetHours.toFixed(1)} h
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <span className={`inline-flex rounded-full border px-3 py-1 text-sm font-medium ${isOverBudget
+                                                ? 'border-rose-400 bg-rose-100 text-rose-800'
+                                                : 'border-emerald-400 bg-emerald-100 text-emerald-800'
+                                                }`}>
+                                                {isOverBudget ? 'Yli budjetin' : 'Budjetissa'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )
+                            })}
                         </div>
+                    )}
+                </article>
 
-                        {invoiceHistory.length === 0 ? (
-                            <div className="mt-5 rounded-2xl border-2 border-dashed border-slate-500 bg-white p-5 text-sm text-slate-700">
-                                Laskuhistoria on vielä tyhjä.
+                <article className="rounded-3xl border-2 border-slate-400 bg-slate-50 p-5">
+                    <div className="flex items-end justify-between gap-4 border-b-2 border-slate-300 pb-4">
+                        <div>
+                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                                Laskuhistoria
+                            </p>
+                            <h3 className="mt-2 text-xl font-semibold text-slate-950">
+                                Tallennetut laskut
+                            </h3>
+                        </div>
+                        <div className="rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-right">
+                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Laskut</p>
+                            <p className="mt-1 text-2xl font-semibold text-slate-950">{invoiceHistory.length}</p>
+                        </div>
+                    </div>
+
+                    {invoiceHistory.length === 0 ? (
+                        <div className="mt-5 rounded-2xl border-2 border-dashed border-slate-500 bg-white p-5 text-sm text-slate-700">
+                            Laskuhistoria on vielä tyhjä.
+                        </div>
+                    ) : (
+                        <div className="mt-5 overflow-x-auto rounded-2xl border-2 border-slate-400 bg-white">
+                            <div className="hidden min-w-[920px] gap-4 border-b-2 border-slate-400 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 lg:grid lg:grid-cols-[140px_minmax(220px,1fr)_120px_150px_110px_auto] lg:items-center">
+                                <span className="whitespace-nowrap">Lasku</span>
+                                <span className="whitespace-nowrap">Asiakas</span>
+                                <span className="whitespace-nowrap">Päiväys</span>
+                                <span className="whitespace-nowrap">Yhteensä sis. ALV</span>
+                                <span className="whitespace-nowrap">Tila</span>
+                                <span></span>
                             </div>
-                        ) : (
-                            <div className="mt-5 overflow-hidden rounded-2xl border-2 border-slate-400">
-                                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_120px_150px_120px_120px] gap-4 border-b-2 border-slate-400 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700">
-                                    <span>Lasku</span>
-                                    <span>Asiakas</span>
-                                    <span>Päiväys</span>
-                                    <span>Yhteensä sis. ALV</span>
-                                    <span>Tila</span>
-                                    <span></span>
-                                </div>
 
-                                <div className="divide-y-2 divide-slate-300 bg-white">
-                                    {invoiceHistory.map(({ invoice, client, totalWithVat }) => (
-                                        <div
-                                            key={invoice.id}
-                                            className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_120px_150px_120px_120px] gap-4 px-4 py-4 text-sm text-slate-800"
-                                        >
-                                            <p className="font-medium text-slate-950">{invoice.invoiceNumber}</p>
-                                            <p>{client?.name ?? 'Tuntematon asiakas'}</p>
-                                            <p>{formatFinnishDate(invoice.date)}</p>
-                                            <p className="font-medium text-slate-950">{totalWithVat.toFixed(2)} EUR</p>
-                                            <p>{invoiceStatusLabels[invoice.status]}</p>
-                                            <div className="text-right">
+                            <div className="divide-y-2 divide-slate-300 bg-white">
+                                {invoiceHistory.map(({ invoice, client, totalWithVat }) => (
+                                    <article key={invoice.id} className="px-4 py-4 text-sm text-slate-800">
+                                        <div className="grid gap-4 sm:grid-cols-2 lg:min-w-[920px] lg:grid-cols-[140px_minmax(220px,1fr)_120px_150px_110px_auto] lg:items-center">
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 lg:hidden">Lasku</p>
+                                                <p className="mt-1 font-mono font-semibold text-slate-950 whitespace-nowrap lg:mt-0">{invoice.invoiceNumber}</p>
+                                            </div>
+
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 lg:hidden">Asiakas</p>
+                                                <p className="mt-1 truncate text-slate-800 whitespace-nowrap lg:mt-0" title={client?.name ?? 'Tuntematon asiakas'}>{client?.name ?? 'Tuntematon asiakas'}</p>
+                                            </div>
+
+                                            <div>
+                                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 lg:hidden">Päiväys</p>
+                                                <p className="mt-1 whitespace-nowrap lg:mt-0">{formatFinnishDate(invoice.date)}</p>
+                                            </div>
+
+                                            <div>
+                                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 lg:hidden">Yhteensä sis. ALV</p>
+                                                <p className="mt-1 font-medium text-slate-950 whitespace-nowrap lg:mt-0">{totalWithVat.toFixed(2)} EUR</p>
+                                            </div>
+
+                                            <div>
+                                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 lg:hidden">Tila</p>
+                                                <p className="mt-1 whitespace-nowrap lg:mt-0">{invoiceStatusLabels[invoice.status]}</p>
+                                            </div>
+
+                                            <div className="sm:col-span-2 lg:col-span-1 lg:text-right">
                                                 <button
                                                     type="button"
-                                                    onClick={() => setPreviewInvoiceId(invoice.id)}
-                                                    className="inline-flex items-center justify-center rounded-xl border-2 border-slate-400 bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                                                    onClick={() => handlePreviewInvoice(invoice)}
+                                                    className="inline-flex items-center justify-center whitespace-nowrap rounded-xl border-2 border-slate-400 bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
                                                 >
                                                     Esikatsele
                                                 </button>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
+                                    </article>
+                                ))}
                             </div>
-                        )}
-                    </article>
-                </div>
-
-                <aside className="rounded-3xl border-2 border-slate-400 bg-slate-50 p-5 shadow-sm shadow-slate-300/60">
-                    <div className="flex items-center justify-between gap-4">
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                            Laskun esikatselu
-                        </p>
-                        {previewInvoice && previewClient ? (
-                            <button
-                                type="button"
-                                onClick={() => window.print()}
-                                className="screen-only inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-                            >
-                                Lataa PDF / tulosta
-                            </button>
-                        ) : null}
-                    </div>
-
-                    {previewInvoice && previewClient ? (
-                        <div className="mt-5">
-                            <InvoiceTemplate
-                                invoice={previewInvoice}
-                                client={previewClient}
-                                lines={previewLines}
-                            />
-                        </div>
-                    ) : (
-                        <div className="mt-5 rounded-2xl border-2 border-dashed border-slate-500 bg-white p-5 text-sm text-slate-700">
-                            Valitse lasku listalta, niin voit esikatsella sen uudelleen.
                         </div>
                     )}
-                </aside>
+                </article>
             </div>
         </section>
     )
