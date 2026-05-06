@@ -1,0 +1,357 @@
+import { useEffect, useState } from 'react'
+
+import { Dashboard } from './components/Dashboard'
+import { Historia } from './components/Historia'
+import { ApprovalView } from './components/ApprovalView'
+import { InvoicingView } from './components/InvoicingView'
+import { NewProjectForm } from './components/NewProjectForm'
+import { ProjectList } from './components/ProjectList'
+import { TimeTracker } from './components/TimeTracker'
+import {
+  mapClientRow,
+  mapInvoiceRow,
+  mapProjectRow,
+  mapTimeEntryRow,
+  toClientInsert,
+  toInvoiceInsert,
+  toProjectInsert,
+  toTimeEntryInsert,
+} from './data/supabaseMappers'
+import { supabase } from './supabaseClient'
+import { getTodayIsoDate } from './utils/date'
+
+import type {
+  Client,
+  ClientRow,
+  Invoice,
+  InvoiceRow,
+  NewClient,
+  NewProject,
+  NewTimeEntry,
+  Project,
+  ProjectRow,
+  TimeEntry,
+  TimeEntryRow,
+} from './types/types'
+
+type AppView = 'dashboard' | 'tracker' | 'management' | 'history'
+
+function App() {
+  const [activeView, setActiveView] = useState<AppView>('dashboard')
+  const [clients, setClients] = useState<Client[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [isDataLoading, setIsDataLoading] = useState(true)
+  const [dataError, setDataError] = useState<string | null>(null)
+  useEffect(() => {
+    let isActive = true
+
+    async function loadData() {
+      setIsDataLoading(true)
+
+      const [clientsResponse, projectsResponse, timeEntriesResponse, invoicesResponse] = await Promise.all([
+        supabase.from('clients').select('*'),
+        supabase.from('projects').select('*'),
+        supabase.from('time_entries').select('*'),
+        supabase.from('invoices').select('*'),
+      ])
+
+      const firstError =
+        clientsResponse.error ??
+        projectsResponse.error ??
+        timeEntriesResponse.error ??
+        invoicesResponse.error
+
+      if (firstError) {
+        if (isActive) {
+          setDataError(firstError.message)
+          setIsDataLoading(false)
+        }
+
+        return
+      }
+
+      if (!isActive) {
+        return
+      }
+
+      setClients((clientsResponse.data as ClientRow[]).map(mapClientRow))
+      setProjects((projectsResponse.data as ProjectRow[]).map(mapProjectRow))
+      setTimeEntries((timeEntriesResponse.data as TimeEntryRow[]).map(mapTimeEntryRow))
+      setInvoices((invoicesResponse.data as InvoiceRow[]).map(mapInvoiceRow))
+      setDataError(null)
+      setIsDataLoading(false)
+    }
+
+    void loadData()
+
+    return () => {
+      isActive = false
+    }
+  }, [])
+
+
+  const draftCount = timeEntries.filter((entry) => entry.status === 'draft').length
+  const approvedCount = timeEntries.filter((entry) => entry.status === 'approved').length
+
+  const navigationItems: Array<{ id: AppView; label: string; hint: string }> = [
+    { id: 'dashboard', label: 'Yhteenveto', hint: 'Raportit ja KPI:t' },
+    { id: 'tracker', label: 'Seuranta', hint: 'Projektit ja tunnit' },
+    { id: 'management', label: 'Hallinta', hint: 'Hyväksyntä ja laskutus' },
+    { id: 'history', label: 'Historia', hint: 'Projektit ja laskut' },
+  ]
+
+  async function handleAddTimeEntry(entry: NewTimeEntry) {
+    const { data, error } = await supabase
+      .from('time_entries')
+      .insert([toTimeEntryInsert(entry)])
+      .select('*')
+      .single()
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    setTimeEntries((currentEntries) => [mapTimeEntryRow(data as TimeEntryRow), ...currentEntries])
+  }
+
+  async function handleAddProject(project: NewProject) {
+    const { data, error } = await supabase
+      .from('projects')
+      .insert([toProjectInsert(project)])
+      .select('*')
+      .single()
+
+    if (error) {
+      throw error
+    }
+
+    setProjects((currentProjects) => [mapProjectRow(data as ProjectRow), ...currentProjects])
+  }
+
+  async function handleAddClient(client: NewClient) {
+    const { data, error } = await supabase
+      .from('clients')
+      .insert([toClientInsert(client)])
+      .select('*')
+      .single()
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    const createdClient = mapClientRow(data as ClientRow)
+    setClients((currentClients) => [createdClient, ...currentClients])
+    return createdClient
+  }
+
+  async function handleApproveEntries(entryIds: string[]) {
+    const selectedIds = new Set(entryIds)
+
+    const responses = await Promise.all(
+      entryIds.map((id) =>
+        supabase
+          .from('time_entries')
+          .update({ status: 'approved' })
+          .eq('id', id),
+      ),
+    )
+
+    const failedResponse = responses.find((response) => response.error)
+    if (failedResponse?.error) {
+      throw failedResponse.error
+    }
+
+    setTimeEntries((currentEntries) =>
+      currentEntries.map((entry) =>
+        selectedIds.has(entry.id) ? { ...entry, status: 'approved' } : entry,
+      ),
+    )
+  }
+
+  async function handleGenerateInvoice(clientId: string, entryIds: string[], totalAmount: number) {
+    const invoiceDraft: Omit<Invoice, 'id'> = {
+      clientId,
+      invoiceNumber: `LASKU-${Date.now()}`,
+      date: getTodayIsoDate(),
+      totalAmount,
+      status: 'draft',
+    }
+
+    const selectedIds = new Set(entryIds)
+
+    const { data: invoiceData, error: invoiceError } = await supabase
+      .from('invoices')
+      .insert([toInvoiceInsert(invoiceDraft)])
+      .select('*')
+      .single()
+
+    if (invoiceError) {
+      throw new Error(invoiceError.message)
+    }
+
+    const invoice = mapInvoiceRow(invoiceData as InvoiceRow)
+
+    const { error: updateError } = await supabase
+      .from('time_entries')
+      .update({ status: 'invoiced', invoice_id: invoice.id })
+      .in('id', entryIds)
+
+    if (updateError) {
+      throw new Error(updateError.message)
+    }
+
+    setInvoices((currentInvoices) => [invoice, ...currentInvoices])
+    setTimeEntries((currentEntries) =>
+      currentEntries.map((entry) =>
+        selectedIds.has(entry.id) ? { ...entry, status: 'invoiced', invoiceId: invoice.id } : entry,
+      ),
+    )
+
+    return invoice
+  }
+
+  function renderActiveView() {
+    if (activeView === 'dashboard') {
+      return <Dashboard projects={projects} timeEntries={timeEntries} />
+    }
+
+    if (activeView === 'tracker') {
+      return (
+        <div className="flex flex-col gap-8">
+          <NewProjectForm
+            clients={clients}
+            onCreateClient={handleAddClient}
+            onCreateProject={handleAddProject}
+          />
+          <ProjectList
+            clients={clients}
+            projects={projects}
+            isLoading={isDataLoading}
+            errorMessage={dataError}
+          />
+          <TimeTracker
+            clients={clients}
+            projects={projects}
+            entries={timeEntries}
+            onAddEntry={handleAddTimeEntry}
+          />
+        </div>
+      )
+    }
+
+    if (activeView === 'history') {
+      return (
+        <Historia
+          clients={clients}
+          invoices={invoices}
+          projects={projects}
+          timeEntries={timeEntries}
+        />
+      )
+    }
+
+    return (
+      <div className="flex flex-col gap-8">
+        <ApprovalView
+          clients={clients}
+          projects={projects}
+          timeEntries={timeEntries}
+          onApproveEntries={handleApproveEntries}
+        />
+
+        <InvoicingView
+          clients={clients}
+          invoices={invoices}
+          projects={projects}
+          timeEntries={timeEntries}
+          onGenerateInvoice={handleGenerateInvoice}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_transparent_30%),linear-gradient(180deg,_#f8fafc_0%,_#e2e8f0_100%)] px-4 py-10 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-8">
+        <header className="rounded-[2rem] border-2 border-slate-400 bg-white/90 px-6 py-8 shadow-sm shadow-slate-300/70 backdrop-blur sm:px-8">
+          <p className="text-sm font-medium uppercase tracking-[0.24em] text-emerald-700">
+            Iisiduuni ERP
+          </p>
+          <div className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <h1 className="text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
+                Minimalistinen ohjausnäkymä ohjelmistoyhtiölle
+              </h1>
+              <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
+                Hallitse asiakasprojektit ja päivittäiset tuntikirjaukset yhdestä kevyestä käyttöliittymästä.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border-2 border-slate-800 bg-slate-950 px-5 py-4 text-white">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Asiakkaat</p>
+                <p className="mt-2 text-2xl font-semibold">{clients.length}</p>
+              </div>
+              <div className="rounded-2xl border-2 border-slate-400 bg-white px-5 py-4 text-slate-950">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Projektit</p>
+                <p className="mt-2 text-2xl font-semibold">{projects.length}</p>
+              </div>
+              <div className="rounded-2xl border-2 border-slate-400 bg-white px-5 py-4 text-slate-950">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Laskut</p>
+                <p className="mt-2 text-2xl font-semibold">{invoices.length}</p>
+              </div>
+            </div>
+          </div>
+
+          {dataError ? (
+            <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {dataError}
+            </div>
+          ) : null}
+
+          <div className="mt-8 flex flex-col gap-4 border-t-2 border-slate-400 pt-6 lg:flex-row lg:items-center lg:justify-between">
+            <nav className="flex flex-wrap gap-3" aria-label="Päänavigaatio">
+              {navigationItems.map((item) => {
+                const isActive = activeView === item.id
+
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveView(item.id)}
+                    className={`rounded-2xl px-4 py-3 text-left transition ${isActive
+                      ? 'border-2 border-slate-950 bg-slate-950 text-white shadow-lg shadow-slate-900/10'
+                      : 'border-2 border-slate-400 bg-white text-slate-900 hover:bg-slate-100'
+                      }`}
+                  >
+                    <span className="block text-sm font-semibold">{item.label}</span>
+                    <span className={`block text-xs ${isActive ? 'text-slate-300' : 'text-slate-500'}`}>
+                      {item.hint}
+                    </span>
+                  </button>
+                )
+              })}
+            </nav>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-amber-700">Luonnokset</p>
+                <p className="mt-1 text-xl font-semibold text-slate-950">{draftCount}</p>
+              </div>
+              <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-emerald-700">Hyväksytyt</p>
+                <p className="mt-1 text-xl font-semibold text-slate-950">{approvedCount}</p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {renderActiveView()}
+      </div>
+    </main>
+  )
+}
+
+export default App

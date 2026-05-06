@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-slate-100 text-slate-950;
+  }
+
+  hr {
+    @apply my-6 border-0 border-t-2 border-slate-400;
+  }
+
+  input,
+  select,
+  textarea {
+    @apply border-2 border-slate-400 text-slate-950;
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    @apply border-emerald-500 ring-4 ring-emerald-200 outline-none;
+  }
+}
+
+@media print {
+  body {
+    background: white;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-invoice-root,
+  .print-invoice-root * {
+    visibility: visible;
+  }
+
+  .print-invoice-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .screen-only {
+    display: none !important;
+  }
+}
