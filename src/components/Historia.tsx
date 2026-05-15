@@ -1,7 +1,8 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { InvoicePrintView } from './InvoicePrintView'
+import { ProjectPrintView } from './ProjectPrintView'
 
 import type { Client, Invoice, Project, ProjectStatus, TimeEntry } from '../types/types'
 import { formatFinnishDate } from '../utils/date'
@@ -51,6 +52,8 @@ const invoiceStatusLabels = {
 } as const
 
 export function Historia({ clients, invoices, projects, timeEntries }: HistoriaProps) {
+    const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
+
     const clientById = useMemo(
         () => new Map(clients.map((client) => [client.id, client])),
         [clients],
@@ -88,6 +91,59 @@ export function Historia({ clients, invoices, projects, timeEntries }: HistoriaP
         })),
         [clientById, invoices],
     )
+
+    function handlePreviewProject(project: Project) {
+        const previewClient = clientById.get(project.clientId)
+
+        if (!previewClient) {
+            return
+        }
+
+        const projectEntries = timeEntries.filter((e) => e.projectId === project.id)
+
+        const printWindow = window.open('', '_blank', 'popup=yes,width=1080,height=900')
+
+        if (!printWindow) {
+            return
+        }
+
+        const activePrintWindow: Window = printWindow
+        const printDocument = activePrintWindow.document
+
+        printDocument.documentElement.lang = 'fi'
+        printDocument.title = `Projektiyhteenveto – ${project.name}`
+        printDocument.head.innerHTML = `<meta charset="utf-8" /><title>Projektiyhteenveto – ${project.name}</title><style>${printWindowStyles}</style>`
+        printDocument.body.innerHTML = '<div id="project-print-root"></div>'
+
+        const printRootElement = printDocument.getElementById('project-print-root')
+
+        if (!printRootElement) {
+            activePrintWindow.close()
+            return
+        }
+
+        const printRoot = createRoot(printRootElement)
+        const logoSrc = new URL('/lasku.png', window.location.origin).toString()
+
+        function triggerPrint() {
+            if (activePrintWindow.closed) {
+                return
+            }
+
+            activePrintWindow.focus()
+            activePrintWindow.print()
+        }
+
+        printRoot.render(
+            <ProjectPrintView
+                project={project}
+                client={previewClient}
+                timeEntries={projectEntries}
+                logoSrc={logoSrc}
+                onReady={triggerPrint}
+            />,
+        )
+    }
 
     function handlePreviewInvoice(invoice: Invoice) {
         const previewClient = clientById.get(invoice.clientId)
@@ -198,35 +254,117 @@ export function Historia({ clients, invoices, projects, timeEntries }: HistoriaP
                         <div className="mt-5 divide-y-2 divide-slate-300 overflow-hidden rounded-2xl border-2 border-slate-400 bg-white">
                             {projectHistory.map(({ project, client, totalHours }) => {
                                 const isOverBudget = totalHours > project.budgetHours
+                                const isExpanded = expandedProjectId === project.id
+                                const projectEntries = timeEntries
+                                    .filter((e) => e.projectId === project.id)
+                                    .sort((a, b) => a.date.localeCompare(b.date))
+                                const billableHours = projectEntries
+                                    .filter((e) => e.isBillable)
+                                    .reduce((sum, e) => sum + e.duration, 0)
 
                                 return (
-                                    <div key={project.id} className="grid gap-4 px-5 py-4 md:grid-cols-[minmax(0,1.6fr)_140px_140px_140px] md:items-center">
-                                        <div>
-                                            <p className="text-base font-semibold text-slate-950">{project.name}</p>
-                                            <p className="mt-1 text-sm text-slate-700">
-                                                {client?.name ?? 'Tuntematon asiakas'}
-                                            </p>
+                                    <div key={project.id}>
+                                        {/* Project row */}
+                                        <div
+                                            className="grid gap-4 px-5 py-4 md:grid-cols-[minmax(0,1.6fr)_140px_140px_140px_auto] md:items-center cursor-pointer hover:bg-slate-50 transition-colors"
+                                            onClick={() => setExpandedProjectId(isExpanded ? null : project.id)}
+                                        >
+                                            <div>
+                                                <p className="text-base font-semibold text-slate-950">{project.name}</p>
+                                                <p className="mt-1 text-sm text-slate-700">
+                                                    {client?.name ?? 'Tuntematon asiakas'}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tila</p>
+                                                <p className="mt-1 font-medium text-slate-950">
+                                                    {projectStatusLabels[project.status]}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tunnit / budjetti</p>
+                                                <p className="mt-1 font-medium text-slate-950">
+                                                    {totalHours.toFixed(1)} h / {project.budgetHours.toFixed(1)} h
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <span className={`inline-flex rounded-full border px-3 py-1 text-sm font-medium ${isOverBudget
+                                                    ? 'border-rose-400 bg-rose-100 text-rose-800'
+                                                    : 'border-emerald-400 bg-emerald-100 text-emerald-800'
+                                                    }`}>
+                                                    {isOverBudget ? 'Yli budjetin' : 'Budjetissa'}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handlePreviewProject(project)
+                                                    }}
+                                                    className="inline-flex items-center justify-center whitespace-nowrap rounded-xl border-2 border-slate-400 bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                                                >
+                                                    Lataa
+                                                </button>
+                                                <span className="text-slate-400 select-none">{isExpanded ? '▲' : '▼'}</span>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tila</p>
-                                            <p className="mt-1 font-medium text-slate-950">
-                                                {projectStatusLabels[project.status]}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tunnit / budjetti</p>
-                                            <p className="mt-1 font-medium text-slate-950">
-                                                {totalHours.toFixed(1)} h / {project.budgetHours.toFixed(1)} h
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <span className={`inline-flex rounded-full border px-3 py-1 text-sm font-medium ${isOverBudget
-                                                ? 'border-rose-400 bg-rose-100 text-rose-800'
-                                                : 'border-emerald-400 bg-emerald-100 text-emerald-800'
-                                                }`}>
-                                                {isOverBudget ? 'Yli budjetin' : 'Budjetissa'}
-                                            </span>
-                                        </div>
+
+                                        {/* Expanded time entries */}
+                                        {isExpanded && (
+                                            <div className="border-t-2 border-slate-200 bg-slate-50 px-5 py-4">
+                                                <div className="mb-3 flex flex-wrap gap-4 text-sm">
+                                                    <span className="text-slate-600">
+                                                        <span className="font-semibold text-slate-950">{totalHours.toFixed(1)} h</span> yhteensä
+                                                    </span>
+                                                    <span className="text-slate-600">
+                                                        <span className="font-semibold text-slate-950">{billableHours.toFixed(1)} h</span> laskutettavaa
+                                                    </span>
+                                                    <span className="text-slate-600">
+                                                        <span className="font-semibold text-slate-950">
+                                                            {(billableHours * project.hourlyRate).toFixed(2)} EUR
+                                                        </span> laskutettava arvo
+                                                    </span>
+                                                    <span className="text-slate-600">
+                                                        <span className="font-semibold text-slate-950">{project.hourlyRate.toFixed(2)} EUR/h</span> tuntihinta
+                                                    </span>
+                                                </div>
+
+                                                {projectEntries.length === 0 ? (
+                                                    <p className="text-sm text-slate-500 italic">Ei tuntikirjauksia.</p>
+                                                ) : (
+                                                    <div className="overflow-hidden rounded-xl border-2 border-slate-300 bg-white">
+                                                        <div className="hidden grid-cols-[110px_minmax(0,1fr)_90px_100px] gap-3 border-b-2 border-slate-300 bg-slate-100 px-4 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-600 sm:grid">
+                                                            <span>Päivä</span>
+                                                            <span>Kuvaus</span>
+                                                            <span className="text-right">Tunnit</span>
+                                                            <span className="text-right">Laskutettava</span>
+                                                        </div>
+                                                        <div className="divide-y divide-slate-200">
+                                                            {projectEntries.map((entry) => (
+                                                                <div
+                                                                    key={entry.id}
+                                                                    className="grid gap-3 px-4 py-3 text-sm sm:grid-cols-[110px_minmax(0,1fr)_90px_100px] sm:items-center"
+                                                                >
+                                                                    <span className="text-slate-700 whitespace-nowrap">
+                                                                        {formatFinnishDate(entry.date)}
+                                                                    </span>
+                                                                    <span className="text-slate-800">
+                                                                        {entry.description || <em className="text-slate-400">Ei kuvausta</em>}
+                                                                    </span>
+                                                                    <span className="text-right font-medium text-slate-950 whitespace-nowrap">
+                                                                        {entry.duration.toFixed(1)} h
+                                                                    </span>
+                                                                    <span className={`text-right text-xs font-medium ${entry.isBillable ? 'text-emerald-700' : 'text-slate-400'}`}>
+                                                                        {entry.isBillable ? 'Laskutettava' : 'Ei laskuteta'}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 )
                             })}

@@ -206,7 +206,7 @@ export function NewProjectForm({ clients, onCreateClient, onCreateProject }: New
             {isOpen ? (
                 <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
                     <form
-                        className="grid gap-5 rounded-3xl border-2 border-slate-400 bg-slate-50 p-5 md:grid-cols-2"
+                        className="grid gap-5 rounded-3xl border-2 border-slate-400 bg-slate-50 p-5 md:grid-cols-2 self-start"
                         onSubmit={handleProjectSubmit}
                     >
                         <label className="block md:col-span-2">
