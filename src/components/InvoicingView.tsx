@@ -242,7 +242,7 @@ export function InvoicingView({
         }
 
         const printRoot = createRoot(printRootElement)
-        const logoSrc = new URL('/lasku.png', window.location.origin).toString()
+        const logoSrc = localStorage.getItem('invoice_logo') ?? ''
 
         printRoot.render(
             <InvoicePrintView
@@ -421,6 +421,13 @@ export function InvoicingView({
                             Luo lasku asiakkaalle, niin PDF-vienti voidaan avata uuteen ikkunaan.
                         </div>
                     )}
+
+                    <div className="mt-5 border-t-2 border-slate-300 pt-5">
+                        <p className="text-sm text-slate-500">
+                            Logo ja yritystiedot hallitaan{' '}
+                            <span className="font-medium text-slate-700">Asetukset</span>-välilehdellä.
+                        </p>
+                    </div>
                 </aside>
             </div>
         </section>

@@ -122,7 +122,9 @@ export function ApprovalView({
                             return (
                                 <article
                                     key={entry.id}
-                                    className="grid grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_90px_120px] gap-4 px-4 py-4 text-sm text-slate-700"
+                                    className={`grid grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_90px_120px] gap-4 px-4 py-4 text-sm text-slate-700 ${
+                                        entry.isBillable ? '' : 'bg-slate-50'
+                                    }`}
                                 >
                                     <label className="flex items-start pt-1">
                                         <input
@@ -134,20 +136,30 @@ export function ApprovalView({
                                     </label>
 
                                     <div>
-                                        <p className="font-medium text-slate-900">{entry.description}</p>
-                                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-amber-700">
-                                            Odottaa hyväksyntää
+                                        <p className={`font-medium ${entry.isBillable ? 'text-slate-900' : 'text-slate-500'}`}>
+                                            {entry.description}
                                         </p>
+                                        {entry.isBillable ? (
+                                            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-amber-700">
+                                                Odottaa hyväksyntää
+                                            </p>
+                                        ) : (
+                                            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
+                                                Muu työ — menee historiaan
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div>
-                                        <p className="font-medium text-slate-900">
+                                        <p className={`font-medium ${entry.isBillable ? 'text-slate-900' : 'text-slate-500'}`}>
                                             {client?.name ?? 'Tuntematon asiakas'}
                                         </p>
                                         <p className="text-slate-600">{project?.name ?? 'Tuntematon projekti'}</p>
                                     </div>
 
-                                    <p className="font-medium text-slate-900">{entry.duration.toFixed(1)} h</p>
+                                    <p className={`font-medium ${entry.isBillable ? 'text-slate-900' : 'text-slate-400'}`}>
+                                        {entry.duration.toFixed(1)} h
+                                    </p>
                                     <p className="text-slate-700">{formatFinnishDate(entry.date)}</p>
                                 </article>
                             )

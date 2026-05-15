@@ -14,6 +14,7 @@ type TimeEntryFormState = {
     projectId: string
     description: string
     duration: string
+    isBillable: boolean
 }
 
 export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrackerProps) {
@@ -24,6 +25,7 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
         projectId: projects[0]?.id ?? '',
         description: '',
         duration: '',
+        isBillable: true,
     })
 
     const projectById = useMemo(
@@ -55,7 +57,7 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
             date: today,
             duration,
             description: formState.description.trim(),
-            isBillable: true,
+            isBillable: formState.isBillable,
             status: 'draft',
         }
 
@@ -68,6 +70,7 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
                 ...currentState,
                 description: '',
                 duration: '',
+                isBillable: true,
             }))
         } catch (error) {
             setSaveError(error instanceof Error ? error.message : 'Tallennus epäonnistui.')
@@ -125,7 +128,11 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
                                 return (
                                     <article
                                         key={entry.id}
-                                        className="rounded-xl border border-slate-600 bg-white/[0.04] px-3 py-2.5"
+                                        className={`rounded-xl border px-3 py-2.5 ${
+                                            entry.isBillable
+                                                ? 'border-slate-600 bg-white/[0.04]'
+                                                : 'border-slate-700 bg-slate-800/40 opacity-70'
+                                        }`}
                                     >
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="min-w-0">
@@ -136,9 +143,16 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
                                                     {client?.name ?? 'Tuntematon asiakas'}
                                                 </p>
                                             </div>
-                                            <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-slate-100">
-                                                {entry.duration.toFixed(1)} h
-                                            </span>
+                                            <div className="flex shrink-0 flex-col items-end gap-1">
+                                                <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-slate-100">
+                                                    {entry.duration.toFixed(1)} h
+                                                </span>
+                                                {!entry.isBillable ? (
+                                                    <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs text-slate-400">
+                                                        Muu työ
+                                                    </span>
+                                                ) : null}
+                                            </div>
                                         </div>
                                         <p className="mt-1.5 text-xs leading-5 text-slate-400 line-clamp-2">
                                             {entry.description}
@@ -209,6 +223,21 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
                                 placeholder="esim. 7.5"
                                 className="w-full rounded-2xl border-2 border-slate-400 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-300/30"
                             />
+                        </label>
+
+                        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-slate-600 bg-white/[0.04] px-4 py-3 transition hover:bg-white/[0.07]">
+                            <input
+                                type="checkbox"
+                                checked={!formState.isBillable}
+                                onChange={(event) =>
+                                    setFormState((s) => ({ ...s, isBillable: !event.target.checked }))
+                                }
+                                className="h-4 w-4 rounded border-2 border-slate-500 accent-slate-400"
+                            />
+                            <div>
+                                <span className="block text-sm font-medium text-slate-200">Muu työ</span>
+                                <span className="block text-xs text-slate-400">Ei laskutettava — menee suoraan historiaan</span>
+                            </div>
                         </label>
                     </div>
 

@@ -4,6 +4,7 @@ import { Dashboard } from './components/Dashboard'
 import { Historia } from './components/Historia'
 import { ApprovalView } from './components/ApprovalView'
 import { ClientsView } from './components/ClientsView'
+import { SettingsView } from './components/SettingsView'
 import { InvoicingView } from './components/InvoicingView'
 import { NewProjectForm } from './components/NewProjectForm'
 import { ProjectList } from './components/ProjectList'
@@ -35,7 +36,7 @@ import type {
   TimeEntryRow,
 } from './types/types'
 
-type AppView = 'dashboard' | 'tracker' | 'management' | 'history' | 'clients'
+type AppView = 'dashboard' | 'tracker' | 'management' | 'history' | 'clients' | 'settings'
 
 function getNextInvoiceNumber(existingInvoices: Invoice[], invoiceDate: string) {
   const year = invoiceDate.slice(0, 4)
@@ -124,6 +125,7 @@ function App() {
     { id: 'management', label: 'Hallinta', hint: 'Hyväksyntä ja laskutus' },
     { id: 'history', label: 'Historia', hint: 'Projektit ja laskut' },
     { id: 'clients', label: 'Asiakkaat', hint: 'Asiakashallinta' },
+    { id: 'settings', label: 'Asetukset', hint: 'Yritystiedot ja logo' },
   ]
 
   async function handleAddTimeEntry(entry: NewTimeEntry) {
@@ -251,12 +253,14 @@ function App() {
     const selectedIds = new Set(entryIds)
 
     const responses = await Promise.all(
-      entryIds.map((id) =>
-        supabase
+      entryIds.map((id) => {
+        const entry = timeEntries.find((e) => e.id === id)
+        const newStatus = entry?.isBillable === false ? 'invoiced' : 'approved'
+        return supabase
           .from('time_entries')
-          .update({ status: 'approved' })
-          .eq('id', id),
-      ),
+          .update({ status: newStatus })
+          .eq('id', id)
+      }),
     )
 
     const failedResponse = responses.find((response) => response.error)
@@ -265,9 +269,10 @@ function App() {
     }
 
     setTimeEntries((currentEntries) =>
-      currentEntries.map((entry) =>
-        selectedIds.has(entry.id) ? { ...entry, status: 'approved' } : entry,
-      ),
+      currentEntries.map((entry) => {
+        if (!selectedIds.has(entry.id)) return entry
+        return { ...entry, status: entry.isBillable === false ? 'invoiced' : 'approved' }
+      }),
     )
   }
 
@@ -316,6 +321,10 @@ function App() {
   }
 
   function renderActiveView() {
+    if (activeView === 'settings') {
+      return <SettingsView />
+    }
+
     if (activeView === 'dashboard') {
       return <Dashboard projects={projects} timeEntries={timeEntries} />
     }

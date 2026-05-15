@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 import { addDaysToIsoDate, formatFinnishDate } from '../utils/date'
+import { loadCompanySettings } from './SettingsView'
 
 import type { Client, Invoice } from '../types/types'
 
@@ -21,18 +22,6 @@ type InvoicePrintViewProps = {
     onReady?: () => void
 }
 
-const companyInfo = {
-    name: 'Iisiduuni Oy',
-    businessId: '3135307-9',
-    email: 'info@iisiduuni.fi',
-    phone: '+358 40 000 0000',
-    street: 'Kalliokielontie 18 A 4',
-    city: '94400 Keminmaa',
-    iban: '[Lisää IBAN]',
-    bic: '[Lisää BIC]',
-    paymentTerms: '14 päivää netto',
-}
-
 const pageStyle = {
     width: '210mm',
     minHeight: '297mm',
@@ -45,6 +34,7 @@ const pageStyle = {
 }
 
 export function InvoicePrintView({ invoice, client, lines, logoSrc, onReady }: InvoicePrintViewProps) {
+    const companyInfo = loadCompanySettings()
     const logoRef = useRef<HTMLImageElement | null>(null)
     const hasNotifiedRef = useRef(false)
 
@@ -103,12 +93,14 @@ export function InvoicePrintView({ invoice, client, lines, logoSrc, onReady }: I
                 }}
             >
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <img
-                        ref={logoRef}
-                        src={logoSrc}
-                        alt="Iisiduuni"
-                        style={{ width: '150px', height: 'auto', objectFit: 'contain' }}
-                    />
+                    {logoSrc ? (
+                        <img
+                            ref={logoRef}
+                            src={logoSrc}
+                            alt="Logo"
+                            style={{ width: '150px', height: 'auto', objectFit: 'contain' }}
+                        />
+                    ) : null}
                     <div style={{ fontSize: '13px', lineHeight: 1.55 }}>
                         <div style={{ fontWeight: 700, fontSize: '18px' }}>{companyInfo.name}</div>
                         <div>Y-tunnus: {companyInfo.businessId}</div>
