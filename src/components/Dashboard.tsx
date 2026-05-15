@@ -115,7 +115,7 @@ export function Dashboard({ projects, timeEntries }: DashboardProps) {
                                 <span className="text-3xl font-semibold text-slate-950">
                                     {utilizationRate.toFixed(0)}%
                                 </span>
-                                <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                                <span className="text-xs uppercase tracking-[0.18em] text-slate-900">
                                     Laskutettava
                                 </span>
                             </div>

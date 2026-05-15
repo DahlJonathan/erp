@@ -327,7 +327,7 @@ export function NewProjectForm({ clients, onCreateClient, onCreateProject }: New
                                     value={clientFormState.name}
                                     onChange={(event) => handleClientFieldChange('name', event.target.value)}
                                     disabled={isSavingClient}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                    className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
                                 />
                             </label>
 
@@ -340,7 +340,7 @@ export function NewProjectForm({ clients, onCreateClient, onCreateProject }: New
                                     value={clientFormState.businessId}
                                     onChange={(event) => handleClientFieldChange('businessId', event.target.value)}
                                     disabled={isSavingClient}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                    className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
                                 />
                             </label>
 

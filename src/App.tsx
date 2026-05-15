@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Dashboard } from './components/Dashboard'
 import { Historia } from './components/Historia'
 import { ApprovalView } from './components/ApprovalView'
+import { ClientsView } from './components/ClientsView'
 import { InvoicingView } from './components/InvoicingView'
 import { NewProjectForm } from './components/NewProjectForm'
 import { ProjectList } from './components/ProjectList'
@@ -34,7 +35,7 @@ import type {
   TimeEntryRow,
 } from './types/types'
 
-type AppView = 'dashboard' | 'tracker' | 'management' | 'history'
+type AppView = 'dashboard' | 'tracker' | 'management' | 'history' | 'clients'
 
 function getNextInvoiceNumber(existingInvoices: Invoice[], invoiceDate: string) {
   const year = invoiceDate.slice(0, 4)
@@ -122,6 +123,7 @@ function App() {
     { id: 'tracker', label: 'Seuranta', hint: 'Projektit ja tunnit' },
     { id: 'management', label: 'Hallinta', hint: 'Hyväksyntä ja laskutus' },
     { id: 'history', label: 'Historia', hint: 'Projektit ja laskut' },
+    { id: 'clients', label: 'Asiakkaat', hint: 'Asiakashallinta' },
   ]
 
   async function handleAddTimeEntry(entry: NewTimeEntry) {
@@ -212,6 +214,37 @@ function App() {
     const createdClient = mapClientRow(data as ClientRow)
     setClients((currentClients) => [createdClient, ...currentClients])
     return createdClient
+  }
+
+  async function handleUpdateClient(clientId: string, updatedData: NewClient) {
+    const { data, error } = await supabase
+      .from('clients')
+      .update(toClientInsert(updatedData))
+      .eq('id', clientId)
+      .select('*')
+      .single()
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    const updatedClient = mapClientRow(data as ClientRow)
+    setClients((currentClients) =>
+      currentClients.map((c) => (c.id === clientId ? updatedClient : c)),
+    )
+  }
+
+  async function handleDeleteClient(clientId: string) {
+    const { error } = await supabase
+      .from('clients')
+      .delete()
+      .eq('id', clientId)
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    setClients((currentClients) => currentClients.filter((c) => c.id !== clientId))
   }
 
   async function handleApproveEntries(entryIds: string[]) {
@@ -320,6 +353,17 @@ function App() {
           invoices={invoices}
           projects={projects}
           timeEntries={timeEntries}
+        />
+      )
+    }
+
+    if (activeView === 'clients') {
+      return (
+        <ClientsView
+          clients={clients}
+          onCreateClient={handleAddClient}
+          onUpdateClient={handleUpdateClient}
+          onDeleteClient={handleDeleteClient}
         />
       )
     }

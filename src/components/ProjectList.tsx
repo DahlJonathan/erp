@@ -70,6 +70,7 @@ export function ProjectList({
     const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
     const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false)
     const [filterStatus, setFilterStatus] = useState<ProjectStatus | 'all'>('all')
+    const [confirmDeleteProject, setConfirmDeleteProject] = useState<Project | null>(null)
     const [editFormState, setEditFormState] = useState<EditProjectFormState>({
         name: '',
         hourlyRate: '',
@@ -157,15 +158,15 @@ export function ProjectList({
         }
     }
 
-    async function handleDeleteClick(project: Project) {
-        const isConfirmed = window.confirm(
-            'Haluatko varmasti poistaa projektin? Tämä poistaa myös kaikki siihen liittyvät tuntikirjaukset.',
-        )
+    function handleDeleteClick(project: Project) {
+        setConfirmDeleteProject(project)
+    }
 
-        if (!isConfirmed) {
-            return
-        }
+    async function handleDeleteConfirm() {
+        if (!confirmDeleteProject) return
 
+        const project = confirmDeleteProject
+        setConfirmDeleteProject(null)
         setDeletingProjectId(project.id)
         setDeleteErrorMessage(null)
 
@@ -462,6 +463,44 @@ export function ProjectList({
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            ) : null}
+
+            {confirmDeleteProject ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+                    <div className="w-full max-w-md rounded-2xl border-2 border-gray-500 bg-white p-6 shadow-2xl shadow-slate-950/20">
+                        <div className="flex items-start gap-4">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-rose-200 bg-rose-50">
+                                <Trash2 size={20} className="text-rose-600" aria-hidden="true" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-950">Poista projekti</h3>
+                                <p className="mt-1 text-sm text-slate-600">
+                                    Oletko varma, että haluat poistaa projektin{' '}
+                                    <span className="font-semibold text-slate-950">{confirmDeleteProject.name}</span>?
+                                </p>
+                                <p className="mt-2 text-sm text-rose-600">
+                                    Tämä poistaa myös kaikki siihen liittyvät tuntikirjaukset. Toimintoa ei voi peruuttaa.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmDeleteProject(null)}
+                                className="rounded-xl border-2 border-gray-400 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                            >
+                                Peruuta
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleDeleteConfirm}
+                                className="rounded-xl border-2 border-rose-600 bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700"
+                            >
+                                Poista projekti
+                            </button>
+                        </div>
                     </div>
                 </div>
             ) : null}

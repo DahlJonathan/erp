@@ -15,7 +15,7 @@ const printWindowStyles = `
     html, body {
         margin: 0;
         padding: 0;
-        background: #ffffff;
+        background: #f1f5f9;
     }
 
     body {
@@ -25,6 +25,55 @@ const printWindowStyles = `
 
     * {
         box-sizing: border-box;
+    }
+
+    #print-toolbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: #0f172a;
+        padding: 10px 20px;
+        font-family: system-ui, sans-serif;
+    }
+
+    #print-toolbar span {
+        color: #94a3b8;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    #print-toolbar button {
+        background: #10b981;
+        color: #ffffff;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 20px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        letter-spacing: 0.02em;
+    }
+
+    #print-toolbar button:hover {
+        background: #059669;
+    }
+
+    #print-content {
+        margin-top: 56px;
+        background: #f1f5f9;
+        padding: 24px 0;
+    }
+
+    @media print {
+        #print-toolbar { display: none !important; }
+        #print-content { margin-top: 0; padding: 0; background: #ffffff; }
+        html, body { background: #ffffff; }
     }
 `
 
@@ -176,7 +225,13 @@ export function InvoicingView({
         printDocument.documentElement.lang = 'fi'
         printDocument.title = `Lasku ${persistedPreview.invoice.invoiceNumber}`
         printDocument.head.innerHTML = `<meta charset="utf-8" /><title>Lasku ${persistedPreview.invoice.invoiceNumber}</title><style>${printWindowStyles}</style>`
-        printDocument.body.innerHTML = '<div id="invoice-print-root"></div>'
+        printDocument.body.innerHTML = `
+            <div id="print-toolbar">
+                <span>Lasku ${persistedPreview.invoice.invoiceNumber}</span>
+                <button onclick="window.print()">&#8595; Lataa PDF</button>
+            </div>
+            <div id="print-content"><div id="invoice-print-root"></div></div>
+        `
 
         const printRootElement = printDocument.getElementById('invoice-print-root')
 
@@ -189,22 +244,12 @@ export function InvoicingView({
         const printRoot = createRoot(printRootElement)
         const logoSrc = new URL('/lasku.png', window.location.origin).toString()
 
-        function triggerPrint() {
-            if (activePrintWindow.closed) {
-                return
-            }
-
-            activePrintWindow.focus()
-            activePrintWindow.print()
-        }
-
         printRoot.render(
             <InvoicePrintView
                 invoice={persistedPreview.invoice}
                 client={persistedPreview.client}
                 lines={persistedPreview.lines}
                 logoSrc={logoSrc}
-                onReady={triggerPrint}
             />,
         )
     }
