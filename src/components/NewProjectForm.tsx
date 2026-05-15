@@ -177,7 +177,7 @@ export function NewProjectForm({ clients, onCreateProject }: NewProjectFormProps
 
             {isOpen ? (
                 <form
-                    className="mt-6 mx-auto grid gap-x-4 gap-y-3 rounded-3xl border-2 border-slate-400 bg-slate-50 p-5 sm:grid-cols-6 max-w-4xl"
+                    className="mt-6 mx-auto grid gap-x-4 gap-y-3 rounded-3xl border-2 border-slate-400 bg-slate-50 p-5 sm:grid-cols-6"
                     onSubmit={handleProjectSubmit}
                 >
                     <label className="block sm:col-span-3">
