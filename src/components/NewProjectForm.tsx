@@ -1,10 +1,67 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import type { Client, NewClient, NewProject, ProjectStatus } from '../types/types'
+import type { Client, NewProject, ProjectStatus } from '../types/types'
+
+function CustomSelect<T extends string>({
+    value,
+    onChange,
+    options,
+    placeholder,
+    disabled,
+}: {
+    value: T | ''
+    onChange: (val: T | '') => void
+    options: Array<{ value: T | ''; label: string }>
+    placeholder?: string
+    disabled?: boolean
+}) {
+    const [open, setOpen] = useState(false)
+    const ref = useRef<HTMLDivElement>(null)
+    const selected = options.find((o) => o.value === value)
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
+    return (
+        <div ref={ref} className="relative">
+            <button
+                type="button"
+                disabled={disabled}
+                onClick={() => setOpen((o) => !o)}
+                className="flex w-full items-center justify-between rounded-2xl border-2 border-slate-400 bg-white px-4 py-2 text-left text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
+            >
+                <span className={value === '' ? 'text-slate-400' : ''}>
+                    {selected ? selected.label : (placeholder ?? 'Valitse...')}
+                </span>
+                <svg className="ml-2 h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" /></svg>
+            </button>
+            {open && (
+                <ul className="absolute z-50 mt-1 w-full overflow-hidden rounded-2xl border-2 border-slate-300 bg-white shadow-lg">
+                    {options.map((opt) => (
+                        <li
+                            key={opt.value}
+                            onClick={() => { onChange(opt.value); setOpen(false) }}
+                            className={`cursor-pointer px-4 py-2 text-sm transition hover:bg-emerald-50 ${
+                                opt.value === value ? 'font-semibold text-emerald-700' : 'text-slate-800'
+                            }`}
+                        >
+                            {opt.label}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    )
+}
+
 
 type NewProjectFormProps = {
     clients: Client[]
-    onCreateClient: (client: NewClient) => Promise<Client>
     onCreateProject: (project: NewProject) => Promise<void>
 }
 
@@ -16,17 +73,6 @@ type ProjectFormState = {
     status: ProjectStatus
 }
 
-type ClientFormState = {
-    name: string
-    businessId: string
-    email: string
-    billingEmail: string
-    contactPerson: string
-    billingAddress: string
-    postalCode: string
-    city: string
-}
-
 const projectStatusOptions: Array<{ value: ProjectStatus; label: string }> = [
     { value: 'planned', label: 'Suunnitteilla' },
     { value: 'active', label: 'Aktiivinen' },
@@ -35,28 +81,16 @@ const projectStatusOptions: Array<{ value: ProjectStatus; label: string }> = [
     { value: 'archived', label: 'Arkistoitu' },
 ]
 
-export function NewProjectForm({ clients, onCreateClient, onCreateProject }: NewProjectFormProps) {
+export function NewProjectForm({ clients, onCreateProject }: NewProjectFormProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [isSavingProject, setIsSavingProject] = useState(false)
-    const [isSavingClient, setIsSavingClient] = useState(false)
     const [projectErrorMessage, setProjectErrorMessage] = useState<string | null>(null)
-    const [clientErrorMessage, setClientErrorMessage] = useState<string | null>(null)
     const [projectFormState, setProjectFormState] = useState<ProjectFormState>({
         clientId: '',
         name: '',
         hourlyRate: '',
         budgetHours: '',
         status: 'planned',
-    })
-    const [clientFormState, setClientFormState] = useState<ClientFormState>({
-        name: '',
-        businessId: '',
-        email: '',
-        billingEmail: '',
-        contactPerson: '',
-        billingAddress: '',
-        postalCode: '',
-        city: '',
     })
 
     useEffect(() => {
@@ -70,13 +104,6 @@ export function NewProjectForm({ clients, onCreateClient, onCreateProject }: New
 
     function handleProjectFieldChange(field: keyof ProjectFormState, value: string) {
         setProjectFormState((currentState) => ({
-            ...currentState,
-            [field]: value,
-        }))
-    }
-
-    function handleClientFieldChange(field: keyof ClientFormState, value: string) {
-        setClientFormState((currentState) => ({
             ...currentState,
             [field]: value,
         }))
@@ -127,61 +154,6 @@ export function NewProjectForm({ clients, onCreateClient, onCreateProject }: New
         }
     }
 
-    async function handleClientSubmit(event: React.FormEvent<HTMLFormElement>) {
-        event.preventDefault()
-
-        if (
-            !clientFormState.name.trim() ||
-            !clientFormState.businessId.trim() ||
-            !clientFormState.email.trim() ||
-            !clientFormState.billingEmail.trim() ||
-            !clientFormState.contactPerson.trim() ||
-            !clientFormState.billingAddress.trim() ||
-            !clientFormState.postalCode.trim() ||
-            !clientFormState.city.trim()
-        ) {
-            setClientErrorMessage('Täytä kaikki asiakkaan tiedot.')
-            return
-        }
-
-        setIsSavingClient(true)
-        setClientErrorMessage(null)
-
-        try {
-            const createdClient = await onCreateClient({
-                name: clientFormState.name.trim(),
-                businessId: clientFormState.businessId.trim(),
-                email: clientFormState.email.trim(),
-                billingEmail: clientFormState.billingEmail.trim(),
-                contactPerson: clientFormState.contactPerson.trim(),
-                billingAddress: clientFormState.billingAddress.trim(),
-                postalCode: clientFormState.postalCode.trim(),
-                city: clientFormState.city.trim(),
-            })
-
-            setClientFormState({
-                name: '',
-                businessId: '',
-                email: '',
-                billingEmail: '',
-                contactPerson: '',
-                billingAddress: '',
-                postalCode: '',
-                city: '',
-            })
-            setProjectFormState((currentState) => ({
-                ...currentState,
-                clientId: createdClient.id,
-            }))
-        } catch (error) {
-            setClientErrorMessage(
-                error instanceof Error ? error.message : 'Asiakkaan tallennus epäonnistui.',
-            )
-        } finally {
-            setIsSavingClient(false)
-        }
-    }
-
     return (
         <section className="rounded-3xl border-2 border-slate-400 bg-white/95 p-6 shadow-sm shadow-slate-300/60">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -204,244 +176,96 @@ export function NewProjectForm({ clients, onCreateClient, onCreateProject }: New
             </div>
 
             {isOpen ? (
-                <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-                    <form
-                        className="grid gap-5 rounded-3xl border-2 border-slate-400 bg-slate-50 p-5 md:grid-cols-2 self-start"
-                        onSubmit={handleProjectSubmit}
-                    >
-                        <label className="block md:col-span-2">
-                            <span className="mb-2 block text-sm font-medium text-slate-700">
-                                Valitse asiakas
-                            </span>
-                            <select
+                <form
+                    className="mt-6 mx-auto grid gap-x-4 gap-y-3 rounded-3xl border-2 border-slate-400 bg-slate-50 p-5 sm:grid-cols-6 max-w-4xl"
+                    onSubmit={handleProjectSubmit}
+                >
+                    <label className="block sm:col-span-3">
+                        <span className="mb-1 block text-sm font-medium text-slate-700">
+                            Valitse asiakas
+                        </span>
+                        <CustomSelect
                                 value={projectFormState.clientId}
-                                onChange={(event) => handleProjectFieldChange('clientId', event.target.value)}
-                                disabled={isSavingProject || isSavingClient}
-                                className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
-                            >
-                                <option value="">Valitse asiakas</option>
-                                {clients.map((client) => (
-                                    <option key={client.id} value={client.id}>
-                                        {client.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-
-                        <label className="block md:col-span-2">
-                            <span className="mb-2 block text-sm font-medium text-slate-700">
-                                Projektin nimi
-                            </span>
-                            <input
-                                type="text"
-                                value={projectFormState.name}
-                                onChange={(event) => handleProjectFieldChange('name', event.target.value)}
+                                onChange={(val) => handleProjectFieldChange('clientId', val)}
+                                placeholder="Valitse asiakas"
                                 disabled={isSavingProject}
-                                className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                options={[
+                                    ...clients.map((c) => ({ value: c.id as string, label: c.name })),
+                                ]}
                             />
-                        </label>
+                    </label>
 
-                        <label className="block">
-                            <span className="mb-2 block text-sm font-medium text-slate-700">
-                                Tuntihinta
-                            </span>
-                            <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={projectFormState.hourlyRate}
-                                onChange={(event) => handleProjectFieldChange('hourlyRate', event.target.value)}
-                                disabled={isSavingProject}
-                                className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
-                            />
-                        </label>
+                    <label className="block sm:col-span-3">
+                        <span className="mb-1 block text-sm font-medium text-slate-700">
+                            Projektin nimi
+                        </span>
+                        <input
+                            type="text"
+                            value={projectFormState.name}
+                            onChange={(event) => handleProjectFieldChange('name', event.target.value)}
+                            disabled={isSavingProject}
+                            className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        />
+                    </label>
 
-                        <label className="block">
-                            <span className="mb-2 block text-sm font-medium text-slate-700">
-                                Budjetoidut tunnit
-                            </span>
-                            <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={projectFormState.budgetHours}
-                                onChange={(event) => handleProjectFieldChange('budgetHours', event.target.value)}
-                                disabled={isSavingProject}
-                                className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
-                            />
-                        </label>
+                    <label className="block sm:col-span-2">
+                        <span className="mb-1 block text-sm font-medium text-slate-700">
+                            Tuntihinta
+                        </span>
+                        <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={projectFormState.hourlyRate}
+                            onChange={(event) => handleProjectFieldChange('hourlyRate', event.target.value)}
+                            disabled={isSavingProject}
+                            className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        />
+                    </label>
 
-                        <label className="block md:col-span-2">
-                            <span className="mb-2 block text-sm font-medium text-slate-700">
-                                Tila
-                            </span>
-                            <select
+                    <label className="block sm:col-span-2">
+                        <span className="mb-1 block text-sm font-medium text-slate-700">
+                            Budjetoidut tunnit
+                        </span>
+                        <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={projectFormState.budgetHours}
+                            onChange={(event) => handleProjectFieldChange('budgetHours', event.target.value)}
+                            disabled={isSavingProject}
+                            className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        />
+                    </label>
+
+                    <label className="block sm:col-span-2">
+                        <span className="mb-1 block text-sm font-medium text-slate-700">
+                            Tila
+                        </span>
+                        <CustomSelect
                                 value={projectFormState.status}
-                                onChange={(event) => handleProjectFieldChange('status', event.target.value as ProjectStatus)}
+                                onChange={(val) => handleProjectFieldChange('status', val as ProjectStatus)}
                                 disabled={isSavingProject}
-                                className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
-                            >
-                                {projectStatusOptions.map((statusOption) => (
-                                    <option key={statusOption.value} value={statusOption.value}>
-                                        {statusOption.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
+                                options={projectStatusOptions}
+                            />
+                    </label>
 
-                        {projectErrorMessage ? (
-                            <div className="md:col-span-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                                {projectErrorMessage}
-                            </div>
-                        ) : null}
-
-                        <div className="md:col-span-2 flex justify-end">
-                            <button
-                                type="submit"
-                                disabled={isSavingProject || isSavingClient || clients.length === 0}
-                                className="inline-flex items-center justify-center rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-                            >
-                                {isSavingProject ? 'Tallennetaan...' : 'Tallenna projekti'}
-                            </button>
+                    {projectErrorMessage ? (
+                        <div className="sm:col-span-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                            {projectErrorMessage}
                         </div>
-                    </form>
+                    ) : null}
 
-                    <form
-                        className="rounded-3xl border-2 border-slate-400 bg-slate-50 p-5"
-                        onSubmit={handleClientSubmit}
-                    >
-                        <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">
-                            Uusi asiakas
-                        </p>
-                        <h3 className="mt-2 text-xl font-semibold text-slate-900">
-                            Luo uusi asiakas
-                        </h3>
-
-                        <div className="mt-5 space-y-4">
-                            <label className="block">
-                                <span className="mb-2 block text-sm font-medium text-slate-700">
-                                    Asiakkaan nimi
-                                </span>
-                                <input
-                                    type="text"
-                                    value={clientFormState.name}
-                                    onChange={(event) => handleClientFieldChange('name', event.target.value)}
-                                    disabled={isSavingClient}
-                                    className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
-                                />
-                            </label>
-
-                            <label className="block">
-                                <span className="mb-2 block text-sm font-medium text-slate-700">
-                                    Y-tunnus
-                                </span>
-                                <input
-                                    type="text"
-                                    value={clientFormState.businessId}
-                                    onChange={(event) => handleClientFieldChange('businessId', event.target.value)}
-                                    disabled={isSavingClient}
-                                    className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
-                                />
-                            </label>
-
-                            <label className="block">
-                                <span className="mb-2 block text-sm font-medium text-slate-700">
-                                    Sähköposti
-                                </span>
-                                <input
-                                    type="email"
-                                    value={clientFormState.email}
-                                    onChange={(event) => handleClientFieldChange('email', event.target.value)}
-                                    disabled={isSavingClient}
-                                    className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
-                                />
-                            </label>
-
-                            <label className="block">
-                                <span className="mb-2 block text-sm font-medium text-slate-700">
-                                    Laskutussähköposti
-                                </span>
-                                <input
-                                    type="email"
-                                    value={clientFormState.billingEmail}
-                                    onChange={(event) => handleClientFieldChange('billingEmail', event.target.value)}
-                                    disabled={isSavingClient}
-                                    className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
-                                />
-                            </label>
-
-                            <label className="block">
-                                <span className="mb-2 block text-sm font-medium text-slate-700">
-                                    Yhteyshenkilö
-                                </span>
-                                <input
-                                    type="text"
-                                    value={clientFormState.contactPerson}
-                                    onChange={(event) => handleClientFieldChange('contactPerson', event.target.value)}
-                                    disabled={isSavingClient}
-                                    className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
-                                />
-                            </label>
-
-                            <label className="block">
-                                <span className="mb-2 block text-sm font-medium text-slate-700">
-                                    Laskutusosoite
-                                </span>
-                                <input
-                                    type="text"
-                                    value={clientFormState.billingAddress}
-                                    onChange={(event) => handleClientFieldChange('billingAddress', event.target.value)}
-                                    disabled={isSavingClient}
-                                    className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
-                                />
-                            </label>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <label className="block">
-                                    <span className="mb-2 block text-sm font-medium text-slate-700">
-                                        Postinumero
-                                    </span>
-                                    <input
-                                        type="text"
-                                        value={clientFormState.postalCode}
-                                        onChange={(event) => handleClientFieldChange('postalCode', event.target.value)}
-                                        disabled={isSavingClient}
-                                        className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
-                                    />
-                                </label>
-
-                                <label className="block">
-                                    <span className="mb-2 block text-sm font-medium text-slate-700">
-                                        Kaupunki
-                                    </span>
-                                    <input
-                                        type="text"
-                                        value={clientFormState.city}
-                                        onChange={(event) => handleClientFieldChange('city', event.target.value)}
-                                        disabled={isSavingClient}
-                                        className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
-                                    />
-                                </label>
-                            </div>
-                        </div>
-
-                        {clientErrorMessage ? (
-                            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                                {clientErrorMessage}
-                            </div>
-                        ) : null}
-
-                        <div className="mt-5 flex justify-end">
-                            <button
-                                type="submit"
-                                disabled={isSavingClient}
-                                className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-                            >
-                                {isSavingClient ? 'Tallennetaan...' : 'Tallenna asiakas'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                    <div className="sm:col-span-6 flex justify-end">
+                        <button
+                            type="submit"
+                            disabled={isSavingProject || clients.length === 0}
+                            className="inline-flex items-center justify-center rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                        >
+                            {isSavingProject ? 'Tallennetaan...' : 'Tallenna projekti'}
+                        </button>
+                    </div>
+                </form>
             ) : null}
         </section>
     )

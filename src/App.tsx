@@ -334,7 +334,6 @@ function App() {
         <div className="flex flex-col gap-8">
           <NewProjectForm
             clients={clients}
-            onCreateClient={handleAddClient}
             onCreateProject={handleAddProject}
           />
           <TimeTracker

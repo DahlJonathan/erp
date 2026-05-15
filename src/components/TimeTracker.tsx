@@ -236,7 +236,7 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
                             />
                             <div>
                                 <span className="block text-sm font-medium text-slate-200">Muu työ</span>
-                                <span className="block text-xs text-slate-400">Ei laskutettava — menee suoraan historiaan</span>
+                                <span className="block text-xs text-slate-400">Ei laskutettava</span>
                             </div>
                         </label>
                     </div>
