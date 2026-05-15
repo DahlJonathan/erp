@@ -295,6 +295,12 @@ function App() {
             onCreateClient={handleAddClient}
             onCreateProject={handleAddProject}
           />
+          <TimeTracker
+            clients={clients}
+            projects={projects}
+            entries={timeEntries}
+            onAddEntry={handleAddTimeEntry}
+          />
           <ProjectList
             clients={clients}
             projects={projects}
@@ -302,12 +308,6 @@ function App() {
             errorMessage={dataError}
             onUpdateProject={handleUpdateProject}
             onDeleteProject={handleDeleteProject}
-          />
-          <TimeTracker
-            clients={clients}
-            projects={projects}
-            entries={timeEntries}
-            onAddEntry={handleAddTimeEntry}
           />
         </div>
       )
@@ -348,13 +348,10 @@ function App() {
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_transparent_30%),linear-gradient(180deg,_#f8fafc_0%,_#e2e8f0_100%)] px-4 py-10 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-8">
         <header className="rounded-[2rem] border-2 border-slate-400 bg-white/90 px-6 py-8 shadow-sm shadow-slate-300/70 backdrop-blur sm:px-8">
-          <p className="text-sm font-medium uppercase tracking-[0.24em] text-emerald-700">
-            Iisiduuni ERP
-          </p>
           <div className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
               <h1 className="text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
-                Minimalistinen ohjausnäkymä ohjelmistoyhtiölle
+                Laskutus ja projektinhallinta
               </h1>
               <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
                 Hallitse asiakasprojektit ja päivittäiset tuntikirjaukset yhdestä kevyestä käyttöliittymästä.

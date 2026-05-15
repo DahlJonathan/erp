@@ -69,12 +69,13 @@ export function ProjectList({
     const [isSavingEdit, setIsSavingEdit] = useState(false)
     const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
     const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false)
+    const [filterStatus, setFilterStatus] = useState<ProjectStatus | 'all'>('all')
     const [editFormState, setEditFormState] = useState<EditProjectFormState>({
         name: '',
         hourlyRate: '',
         budgetHours: '',
         status: 'planned',
-    })
+    });
 
     useEffect(() => {
         setIsProjectListLoading(isLoading)
@@ -86,6 +87,10 @@ export function ProjectList({
 
     const clientById = new Map(clients.map((client) => [client.id, client]))
     const editingProject = projects.find((project) => project.id === editProjectId) ?? null
+
+    const filteredProjects = filterStatus === 'all'
+        ? projects
+        : projects.filter((project) => project.status === filterStatus)
 
     function openEditModal(project: Project) {
         setEditProjectId(project.id)
@@ -182,7 +187,7 @@ export function ProjectList({
     return (
         <>
             <section className="rounded-3xl border-2 border-gray-500 bg-white/95 p-6 shadow-sm shadow-slate-300/60">
-                <div className="mb-6 flex items-start justify-between gap-4">
+                <div className="mb-4 flex items-start justify-between gap-4">
                     <div>
                         <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">
                             Projektit
@@ -195,8 +200,25 @@ export function ProjectList({
                         <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                             Yhteensä
                         </p>
-                        <p className="text-2xl font-semibold text-slate-900">{projects.length}</p>
+                        <p className="text-2xl font-semibold text-slate-900">{filteredProjects.length} / {projects.length}</p>
                     </div>
+                </div>
+
+                <div className="mb-5 flex flex-wrap gap-2">
+                    {([{ value: 'all', label: 'Kaikki' }, ...projectStatusOptions] as Array<{ value: ProjectStatus | 'all'; label: string }>).map((option) => (
+                        <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setFilterStatus(option.value)}
+                            className={`rounded-xl border-2 px-3 py-1.5 text-sm font-semibold transition ${
+                                filterStatus === option.value
+                                    ? 'border-slate-950 bg-slate-950 text-white'
+                                    : 'border-gray-400 bg-white text-slate-700 hover:bg-slate-100'
+                            }`}
+                        >
+                            {option.label}
+                        </button>
+                    ))}
                 </div>
 
                 {projectListError ? (
@@ -217,7 +239,12 @@ export function ProjectList({
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {projects.map((project) => {
+                        {filteredProjects.length === 0 ? (
+                            <div className="rounded-2xl border-2 border-dashed border-gray-400 bg-slate-50 p-5 text-sm text-slate-600">
+                                Ei projekteja valitulla tilalla.
+                            </div>
+                        ) : null}
+                        {filteredProjects.map((project) => {
                             const client = clientById.get(project.clientId)
                             const status = statusConfig[project.status]
                             const isDeleting = deletingProjectId === project.id
