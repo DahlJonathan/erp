@@ -162,7 +162,7 @@ export function Dashboard({ projects, timeEntries }: DashboardProps) {
                         <div className="flex items-end justify-between gap-4">
                             <div>
                                 <p className="text-sm text-slate-400">Jakso</p>
-                                <p className="mt-1 text-lg font-medium">{currentMonth}</p>
+                                <p className="mt-1 text-lg font-medium">{currentMonth.slice(5, 7)}/{currentMonth.slice(0, 4)}</p>
                             </div>
                             <p className="text-3xl font-semibold">{monthlyRevenue.toFixed(2)} EUR</p>
                         </div>
