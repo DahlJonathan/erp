@@ -178,7 +178,7 @@ export function Historia({ clients, invoices, projects, timeEntries }: HistoriaP
         }
 
         const printRoot = createRoot(printRootElement)
-        const logoSrc = new URL('/lasku.png', window.location.origin).toString()
+        const logoSrc = localStorage.getItem('invoice_logo') ?? new URL('/lasku.png', window.location.origin).toString()
 
         printRoot.render(
             <ProjectPrintView
@@ -244,7 +244,7 @@ export function Historia({ clients, invoices, projects, timeEntries }: HistoriaP
         }
 
         const printRoot = createRoot(printRootElement)
-        const logoSrc = new URL('/lasku.png', window.location.origin).toString()
+        const logoSrc = localStorage.getItem('invoice_logo') ?? new URL('/lasku.png', window.location.origin).toString()
 
         printRoot.render(
             <InvoicePrintView

@@ -3,7 +3,8 @@ export function getTodayIsoDate() {
 }
 
 export function getCurrentMonthKey() {
-    return getTodayIsoDate().slice(0, 7)
+    const [year, month] = getTodayIsoDate().slice(0, 7).split('-')
+    return `${month}-${year}`
 }
 
 export function addDaysToIsoDate(isoDate: string, days: number) {

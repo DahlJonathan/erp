@@ -145,16 +145,16 @@ export function ApprovalView({
                                             </p>
                                         ) : (
                                             <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
-                                                Muu työ — menee historiaan
+                                                Muu työ
                                             </p>
                                         )}
                                     </div>
 
                                     <div>
                                         <p className={`font-medium ${entry.isBillable ? 'text-slate-900' : 'text-slate-500'}`}>
-                                            {client?.name ?? 'Tuntematon asiakas'}
+                                            {entry.isBillable ? (client?.name ?? 'Tuntematon asiakas') : '–'}
                                         </p>
-                                        <p className="text-slate-600">{project?.name ?? 'Tuntematon projekti'}</p>
+                                        <p className="text-slate-600">{entry.isBillable ? (project?.name ?? 'Tuntematon projekti') : ''}</p>
                                     </div>
 
                                     <p className={`font-medium ${entry.isBillable ? 'text-slate-900' : 'text-slate-400'}`}>

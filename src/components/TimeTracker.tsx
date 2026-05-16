@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Client, NewTimeEntry, Project, TimeEntry } from '../types/types'
 import { formatFinnishDate, getTodayIsoDate } from '../utils/date'
@@ -15,6 +15,71 @@ type TimeEntryFormState = {
     description: string
     duration: string
     isBillable: boolean
+}
+
+function ProjectSelect({
+    value,
+    onChange,
+    options,
+    disabled,
+}: {
+    value: string
+    onChange: (val: string) => void
+    options: Array<{ value: string; label: string }>
+    disabled?: boolean
+}) {
+    const [open, setOpen] = useState(false)
+    const ref = useRef<HTMLDivElement>(null)
+    const selected = options.find((o) => o.value === value)
+
+    useEffect(() => {
+        if (disabled) setOpen(false)
+    }, [disabled])
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
+    return (
+        <div ref={ref} className="relative">
+            <button
+                type="button"
+                disabled={disabled}
+                onClick={() => setOpen((o) => !o)}
+                className={`flex w-full items-center justify-between rounded-2xl border-2 px-4 py-3 text-left text-sm outline-none transition ${
+                    disabled
+                        ? 'cursor-not-allowed border-slate-700 bg-slate-800 text-slate-500'
+                        : 'border-slate-400 bg-slate-900 text-white focus:border-emerald-300 focus:ring-4 focus:ring-emerald-300/30'
+                }`}
+            >
+                <span className={value === '' ? 'text-slate-400' : ''}>
+                    {selected ? selected.label : 'Valitse projekti...'}
+                </span>
+                <svg className="ml-2 h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                </svg>
+            </button>
+            {open && (
+                <ul className="absolute z-50 mt-1 w-full overflow-hidden rounded-2xl border-2 border-slate-600 bg-slate-800 shadow-lg shadow-black/40">
+                    {options.map((opt) => (
+                        <li
+                            key={opt.value}
+                            onClick={() => { onChange(opt.value); setOpen(false) }}
+                            className={`cursor-pointer px-4 py-2.5 text-sm transition hover:bg-slate-700 ${
+                                opt.value === value ? 'font-semibold text-emerald-300' : 'text-slate-100'
+                            }`}
+                        >
+                            {opt.label}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    )
 }
 
 export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrackerProps) {
@@ -136,12 +201,20 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
                                     >
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="min-w-0">
-                                                <p className="text-sm font-semibold text-white truncate">
-                                                    {project?.name ?? 'Tuntematon projekti'}
-                                                </p>
-                                                <p className="text-xs text-slate-400 truncate">
-                                                    {client?.name ?? 'Tuntematon asiakas'}
-                                                </p>
+                                                {entry.isBillable ? (
+                                                    <>
+                                                        <p className="text-sm font-semibold text-white truncate">
+                                                            {project?.name ?? 'Tuntematon projekti'}
+                                                        </p>
+                                                        <p className="text-xs text-slate-400 truncate">
+                                                            {client?.name ?? 'Tuntematon asiakas'}
+                                                        </p>
+                                                    </>
+                                                ) : (
+                                                    <p className="text-sm font-semibold text-slate-400">
+                                                        Muu työ
+                                                    </p>
+                                                )}
                                             </div>
                                             <div className="flex shrink-0 flex-col items-end gap-1">
                                                 <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-slate-100">
@@ -176,26 +249,23 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
                     </div>
 
                     <div className="mt-6 space-y-5">
-                        <label className="block">
+                        <div>
                             <span className="mb-2 block text-sm font-medium text-slate-200">
                                 Projekti
                             </span>
-                            <select
+                            <ProjectSelect
                                 value={formState.projectId}
-                                onChange={(event) => handleFieldChange('projectId', event.target.value)}
-                                className="w-full rounded-2xl border-2 border-slate-400 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-300/30"
-                            >
-                                {projects.map((project) => {
+                                onChange={(val) => handleFieldChange('projectId', val)}
+                                disabled={!formState.isBillable}
+                                options={projects.map((project) => {
                                     const client = clientById.get(project.clientId)
-
-                                    return (
-                                        <option key={project.id} value={project.id}>
-                                            {client?.name ?? 'Tuntematon asiakas'} / {project.name}
-                                        </option>
-                                    )
+                                    return {
+                                        value: project.id,
+                                        label: `${client?.name ?? 'Tuntematon asiakas'} / ${project.name}`,
+                                    }
                                 })}
-                            </select>
-                        </label>
+                            />
+                        </div>
 
                         <label className="block">
                             <span className="mb-2 block text-sm font-medium text-slate-200">
