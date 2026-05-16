@@ -86,6 +86,7 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
     const today = getTodayIsoDate()
     const [isSaving, setIsSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
+    const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof TimeEntryFormState, string>>>({})
     const [formState, setFormState] = useState<TimeEntryFormState>({
         projectId: projects[0]?.id ?? '',
         description: '',
@@ -113,9 +114,24 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
         event.preventDefault()
 
         const duration = Number(formState.duration)
-        if (!formState.projectId || !formState.description.trim() || duration <= 0) {
+        const errors: Partial<Record<keyof TimeEntryFormState, string>> = {}
+
+        if (formState.isBillable && !formState.projectId) {
+            errors.projectId = 'Valitse projekti.'
+        }
+        if (!formState.description.trim()) {
+            errors.description = 'Kuvaus ei voi olla tyhjä.'
+        }
+        if (!formState.duration || duration <= 0) {
+            errors.duration = 'Syötä tuntimäärä (esim. 7.5).'
+        }
+
+        if (Object.keys(errors).length > 0) {
+            setFieldErrors(errors)
             return
         }
+
+        setFieldErrors({})
 
         const newEntry: NewTimeEntry = {
             projectId: formState.projectId,
@@ -137,6 +153,7 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
                 duration: '',
                 isBillable: true,
             }))
+            setFieldErrors({})
         } catch (error) {
             setSaveError(error instanceof Error ? error.message : 'Tallennus epäonnistui.')
         } finally {
@@ -149,6 +166,9 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
             ...currentState,
             [field]: value,
         }))
+        if (fieldErrors[field]) {
+            setFieldErrors((prev) => ({ ...prev, [field]: undefined }))
+        }
     }
 
     return (
@@ -265,6 +285,9 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
                                     }
                                 })}
                             />
+                            {fieldErrors.projectId ? (
+                                <p className="mt-1.5 text-xs font-medium text-rose-400">{fieldErrors.projectId}</p>
+                            ) : null}
                         </div>
 
                         <label className="block">
@@ -276,8 +299,15 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
                                 value={formState.description}
                                 onChange={(event) => handleFieldChange('description', event.target.value)}
                                 placeholder="Mitä teit tänään?"
-                                className="w-full rounded-2xl border-2 border-slate-400 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-300/30"
+                                className={`w-full rounded-2xl border-2 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-400 focus:ring-4 ${
+                                    fieldErrors.description
+                                        ? 'border-rose-500 focus:border-rose-400 focus:ring-rose-400/30'
+                                        : 'border-slate-400 focus:border-emerald-300 focus:ring-emerald-300/30'
+                                }`}
                             />
+                            {fieldErrors.description ? (
+                                <p className="mt-1.5 text-xs font-medium text-rose-400">{fieldErrors.description}</p>
+                            ) : null}
                         </label>
 
                         <label className="block">
@@ -291,8 +321,15 @@ export function TimeTracker({ clients, projects, entries, onAddEntry }: TimeTrac
                                 value={formState.duration}
                                 onChange={(event) => handleFieldChange('duration', event.target.value)}
                                 placeholder="esim. 7.5"
-                                className="w-full rounded-2xl border-2 border-slate-400 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-300/30"
+                                className={`w-full rounded-2xl border-2 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-400 focus:ring-4 ${
+                                    fieldErrors.duration
+                                        ? 'border-rose-500 focus:border-rose-400 focus:ring-rose-400/30'
+                                        : 'border-slate-400 focus:border-emerald-300 focus:ring-emerald-300/30'
+                                }`}
                             />
+                            {fieldErrors.duration ? (
+                                <p className="mt-1.5 text-xs font-medium text-rose-400">{fieldErrors.duration}</p>
+                            ) : null}
                         </label>
 
                         <label className="flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-slate-600 bg-white/[0.04] px-4 py-3 transition hover:bg-white/[0.07]">

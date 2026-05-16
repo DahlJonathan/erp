@@ -120,7 +120,7 @@ export function Historia({ clients, invoices, projects, timeEntries }: HistoriaP
     const projectHistory = useMemo(
         () => historicalProjects.map((project) => {
             const totalHours = timeEntries
-                .filter((entry) => entry.projectId === project.id)
+                .filter((entry) => entry.projectId === project.id && entry.isBillable)
                 .reduce((sum, entry) => sum + entry.duration, 0)
 
             return {
@@ -297,10 +297,9 @@ export function Historia({ clients, invoices, projects, timeEntries }: HistoriaP
                                 const isOverBudget = totalHours > project.budgetHours
                                 const isExpanded = expandedProjectId === project.id
                                 const projectEntries = timeEntries
-                                    .filter((e) => e.projectId === project.id)
+                                    .filter((e) => e.projectId === project.id && e.isBillable)
                                     .sort((a, b) => a.date.localeCompare(b.date))
                                 const billableHours = projectEntries
-                                    .filter((e) => e.isBillable)
                                     .reduce((sum, e) => sum + e.duration, 0)
 
                                 return (
