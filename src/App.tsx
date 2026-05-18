@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
+import type { Session } from '@supabase/supabase-js'
 
+import { AuthView } from './components/AuthView'
 import { Dashboard } from './components/Dashboard'
 import { Historia } from './components/Historia'
 import { ApprovalView } from './components/ApprovalView'
@@ -61,6 +63,7 @@ function getNextInvoiceNumber(existingInvoices: Invoice[], invoiceDate: string) 
 }
 
 function App() {
+  const [session, setSession] = useState<Session | null | undefined>(undefined)
   const [activeView, setActiveView] = useState<AppView>('dashboard')
   const [clients, setClients] = useState<Client[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -68,7 +71,21 @@ function App() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [isDataLoading, setIsDataLoading] = useState(true)
   const [dataError, setDataError] = useState<string | null>(null)
+
   useEffect(() => {
+    void supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (!session) return
     let isActive = true
 
     async function loadData() {
@@ -113,7 +130,7 @@ function App() {
     return () => {
       isActive = false
     }
-  }, [])
+  }, [session])
 
 
   const draftCount = timeEntries.filter((entry) => entry.status === 'draft').length
@@ -320,9 +337,9 @@ function App() {
     return invoice
   }
 
-  function renderActiveView() {
+  function renderActiveView(userId: string) {
     if (activeView === 'settings') {
-      return <SettingsView />
+      return <SettingsView userId={userId} />
     }
 
     if (activeView === 'dashboard') {
@@ -361,6 +378,7 @@ function App() {
           invoices={invoices}
           projects={projects}
           timeEntries={timeEntries}
+          userId={userId}
         />
       )
     }
@@ -390,16 +408,42 @@ function App() {
           invoices={invoices}
           projects={projects}
           timeEntries={timeEntries}
+          userId={userId}
           onGenerateInvoice={handleGenerateInvoice}
         />
       </div>
     )
   }
 
+  if (session === undefined) {
+    return null
+  }
+
+  if (!session) {
+    return <AuthView />
+  }
+
+  const userId = session.user.id
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_transparent_30%),linear-gradient(180deg,_#f8fafc_0%,_#e2e8f0_100%)] px-4 py-10 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-8">
         <header className="rounded-[2rem] border-2 border-slate-400 bg-white/90 px-6 py-8 shadow-sm shadow-slate-300/70 backdrop-blur sm:px-8">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-500">ERP</span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-slate-700">
+                {session.user.user_metadata?.name ?? session.user.email}
+              </span>
+              <button
+                type="button"
+                onClick={() => supabase.auth.signOut()}
+                className="rounded-2xl border-2 border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+              >
+                Kirjaudu ulos
+              </button>
+            </div>
+          </div>
           <div className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
               <h1 className="text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
@@ -469,7 +513,7 @@ function App() {
           </div>
         </header>
 
-        {renderActiveView()}
+        {renderActiveView(userId)}
       </div>
     </main>
   )

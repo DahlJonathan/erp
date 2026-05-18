@@ -3,6 +3,9 @@ import { useState } from 'react'
 export const COMPANY_SETTINGS_KEY = 'company_settings'
 export const LOGO_KEY = 'invoice_logo'
 
+function settingsKey(userId: string) { return `${COMPANY_SETTINGS_KEY}:${userId}` }
+function logoKey(userId: string) { return `${LOGO_KEY}:${userId}` }
+
 export type CompanySettings = {
     name: string
     businessId: string
@@ -16,20 +19,20 @@ export type CompanySettings = {
 }
 
 export const defaultCompanySettings: CompanySettings = {
-    name: 'Iisiduuni Oy',
-    businessId: '3135307-9',
-    email: 'info@iisiduuni.fi',
-    phone: '+358 40 000 0000',
-    street: 'Kalliokielontie 18 A 4',
-    city: '94400 Keminmaa',
+    name: '',
+    businessId: '',
+    email: '',
+    phone: '',
+    street: '',
+    city: '',
     iban: '',
     bic: '',
-    paymentTerms: '14 päivää netto',
+    paymentTerms: '',
 }
 
-export function loadCompanySettings(): CompanySettings {
+export function loadCompanySettings(userId: string): CompanySettings {
     try {
-        const raw = localStorage.getItem(COMPANY_SETTINGS_KEY)
+        const raw = localStorage.getItem(settingsKey(userId))
         if (!raw) return { ...defaultCompanySettings }
         return { ...defaultCompanySettings, ...JSON.parse(raw) }
     } catch {
@@ -49,9 +52,9 @@ const fields: Array<{ key: keyof CompanySettings; label: string; placeholder: st
     { key: 'paymentTerms', label: 'Maksuehdot', placeholder: '14 päivää netto', colSpan: true },
 ]
 
-export function SettingsView() {
-    const [settings, setSettings] = useState<CompanySettings>(loadCompanySettings)
-    const [logoSrc, setLogoSrc] = useState<string>(() => localStorage.getItem(LOGO_KEY) ?? '')
+export function SettingsView({ userId }: { userId: string }) {
+    const [settings, setSettings] = useState<CompanySettings>(() => loadCompanySettings(userId))
+    const [logoSrc, setLogoSrc] = useState<string>(() => localStorage.getItem(logoKey(userId)) ?? '')
     const [saved, setSaved] = useState(false)
     const [logoError, setLogoError] = useState<string | null>(null)
 
@@ -61,7 +64,7 @@ export function SettingsView() {
     }
 
     function handleSave() {
-        localStorage.setItem(COMPANY_SETTINGS_KEY, JSON.stringify(settings))
+        localStorage.setItem(settingsKey(userId), JSON.stringify(settings))
         setSaved(true)
     }
 
@@ -78,7 +81,7 @@ export function SettingsView() {
         const reader = new FileReader()
         reader.onload = () => {
             const dataUrl = reader.result as string
-            localStorage.setItem(LOGO_KEY, dataUrl)
+            localStorage.setItem(logoKey(userId), dataUrl)
             setLogoSrc(dataUrl)
         }
         reader.readAsDataURL(file)
@@ -86,7 +89,7 @@ export function SettingsView() {
     }
 
     function handleLogoRemove() {
-        localStorage.removeItem(LOGO_KEY)
+        localStorage.removeItem(logoKey(userId))
         setLogoSrc('')
     }
 

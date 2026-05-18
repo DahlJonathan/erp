@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { InvoicePrintView } from './InvoicePrintView'
+import { LOGO_KEY } from './SettingsView'
 
 import type { Client, Invoice, Project, TimeEntry } from '../types/types'
 import { formatFinnishDate } from '../utils/date'
@@ -96,6 +97,7 @@ type InvoicingViewProps = {
     invoices: Invoice[]
     projects: Project[]
     timeEntries: TimeEntry[]
+    userId: string
     onGenerateInvoice: (clientId: string, entryIds: string[], totalAmount: number) => Promise<Invoice>
 }
 
@@ -104,6 +106,7 @@ export function InvoicingView({
     invoices,
     projects,
     timeEntries,
+    userId,
     onGenerateInvoice,
 }: InvoicingViewProps) {
     const [invoicePreview, setInvoicePreview] = useState<InvoicePreview | null>(null)
@@ -242,7 +245,7 @@ export function InvoicingView({
         }
 
         const printRoot = createRoot(printRootElement)
-        const logoSrc = localStorage.getItem('invoice_logo') ?? ''
+        const logoSrc = localStorage.getItem(`${LOGO_KEY}:${userId}`) ?? ''
 
         printRoot.render(
             <InvoicePrintView
@@ -250,6 +253,7 @@ export function InvoicingView({
                 client={persistedPreview.client}
                 lines={persistedPreview.lines}
                 logoSrc={logoSrc}
+                userId={userId}
             />,
         )
     }

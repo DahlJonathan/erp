@@ -19,6 +19,7 @@ type InvoicePrintViewProps = {
     client: Client
     lines: InvoicePrintLine[]
     logoSrc: string
+    userId: string
     onReady?: () => void
 }
 
@@ -33,8 +34,8 @@ const pageStyle = {
     fontFamily: '"Segoe UI", Arial, sans-serif',
 }
 
-export function InvoicePrintView({ invoice, client, lines, logoSrc, onReady }: InvoicePrintViewProps) {
-    const companyInfo = loadCompanySettings()
+export function InvoicePrintView({ invoice, client, lines, logoSrc, userId, onReady }: InvoicePrintViewProps) {
+    const companyInfo = loadCompanySettings(userId)
     const logoRef = useRef<HTMLImageElement | null>(null)
     const hasNotifiedRef = useRef(false)
 
