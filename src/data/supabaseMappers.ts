@@ -1,6 +1,7 @@
 import type {
     Client,
     ClientRow,
+    CompanySettings,
     Invoice,
     InvoiceRow,
     NewClient,
@@ -10,7 +11,9 @@ import type {
     ProjectRow,
     TimeEntry,
     TimeEntryRow,
+    UserSettingsRow,
 } from '../types/types'
+import { defaultCompanySettings } from '../types/types'
 import { getTodayIsoDate } from '../utils/date'
 
 export function mapClientRow(row: ClientRow): Client {
@@ -103,5 +106,40 @@ export function toInvoiceInsert(invoice: Omit<Invoice, 'id'>) {
         invoice_number: invoice.invoiceNumber,
         total_amount: invoice.totalAmount,
         status: invoice.status,
+    }
+}
+
+export function mapUserSettingsRow(row: UserSettingsRow): { settings: CompanySettings; logoSrc: string } {
+    return {
+        settings: {
+            ...defaultCompanySettings,
+            name: row.company_name,
+            businessId: row.business_id,
+            email: row.email,
+            phone: row.phone,
+            street: row.street,
+            city: row.city,
+            iban: row.iban,
+            bic: row.bic,
+            paymentTerms: row.payment_terms,
+        },
+        logoSrc: row.logo_data_url,
+    }
+}
+
+export function toUserSettingsUpsert(userId: string, settings: CompanySettings, logoSrc: string) {
+    return {
+        user_id: userId,
+        company_name: settings.name,
+        business_id: settings.businessId,
+        email: settings.email,
+        phone: settings.phone,
+        street: settings.street,
+        city: settings.city,
+        iban: settings.iban,
+        bic: settings.bic,
+        payment_terms: settings.paymentTerms,
+        logo_data_url: logoSrc,
+        updated_at: new Date().toISOString(),
     }
 }

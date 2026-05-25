@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react'
 
 import { addDaysToIsoDate, formatFinnishDate } from '../utils/date'
-import { loadCompanySettings } from './SettingsView'
 
-import type { Client, Invoice } from '../types/types'
+import type { Client, CompanySettings, Invoice } from '../types/types'
 
 export type InvoicePrintLine = {
     entryId: string
@@ -19,7 +18,7 @@ type InvoicePrintViewProps = {
     client: Client
     lines: InvoicePrintLine[]
     logoSrc: string
-    userId: string
+    companySettings: CompanySettings
     onReady?: () => void
 }
 
@@ -34,8 +33,8 @@ const pageStyle = {
     fontFamily: '"Segoe UI", Arial, sans-serif',
 }
 
-export function InvoicePrintView({ invoice, client, lines, logoSrc, userId, onReady }: InvoicePrintViewProps) {
-    const companyInfo = loadCompanySettings(userId)
+export function InvoicePrintView({ invoice, client, lines, logoSrc, companySettings, onReady }: InvoicePrintViewProps) {
+    const companyInfo = companySettings
     const logoRef = useRef<HTMLImageElement | null>(null)
     const hasNotifiedRef = useRef(false)
 

@@ -3,9 +3,8 @@ import { createRoot } from 'react-dom/client'
 
 import { InvoicePrintView } from './InvoicePrintView'
 import { ProjectPrintView } from './ProjectPrintView'
-import { LOGO_KEY } from './SettingsView'
 
-import type { Client, Invoice, Project, ProjectStatus, TimeEntry } from '../types/types'
+import type { Client, CompanySettings, Invoice, Project, ProjectStatus, TimeEntry } from '../types/types'
 import { formatFinnishDate } from '../utils/date'
 
 const printWindowStyles = `
@@ -85,6 +84,8 @@ type HistoriaProps = {
     projects: Project[]
     timeEntries: TimeEntry[]
     userId: string
+    logoSrc: string
+    companySettings: CompanySettings
 }
 
 const projectStatusLabels: Record<ProjectStatus, string> = {
@@ -102,7 +103,7 @@ const invoiceStatusLabels = {
     overdue: 'Myöhässä',
 } as const
 
-export function Historia({ clients, invoices, projects, timeEntries, userId }: HistoriaProps) {
+export function Historia({ clients, invoices, projects, timeEntries, userId, logoSrc, companySettings }: HistoriaProps) {
     const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
 
     const clientById = useMemo(
@@ -246,7 +247,6 @@ export function Historia({ clients, invoices, projects, timeEntries, userId }: H
         }
 
         const printRoot = createRoot(printRootElement)
-        const logoSrc = localStorage.getItem(`${LOGO_KEY}:${userId}`) ?? new URL('/lasku.png', window.location.origin).toString()
 
         printRoot.render(
             <InvoicePrintView
@@ -254,7 +254,7 @@ export function Historia({ clients, invoices, projects, timeEntries, userId }: H
                 client={previewClient}
                 lines={previewLines}
                 logoSrc={logoSrc}
-                userId={userId}
+                companySettings={companySettings}
             />,
         )
     }

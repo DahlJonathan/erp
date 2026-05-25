@@ -16,6 +16,7 @@ import {
   mapInvoiceRow,
   mapProjectRow,
   mapTimeEntryRow,
+  mapUserSettingsRow,
   toClientInsert,
   toInvoiceInsert,
   toProjectInsert,
@@ -27,6 +28,7 @@ import { getTodayIsoDate } from './utils/date'
 import type {
   Client,
   ClientRow,
+  CompanySettings,
   Invoice,
   InvoiceRow,
   NewClient,
@@ -36,7 +38,9 @@ import type {
   ProjectRow,
   TimeEntry,
   TimeEntryRow,
+  UserSettingsRow,
 } from './types/types'
+import { defaultCompanySettings } from './types/types'
 
 type AppView = 'dashboard' | 'tracker' | 'management' | 'history' | 'clients' | 'settings'
 
@@ -69,6 +73,8 @@ function App() {
   const [projects, setProjects] = useState<Project[]>([])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [companySettings, setCompanySettings] = useState<CompanySettings>(defaultCompanySettings)
+  const [logoSrc, setLogoSrc] = useState<string>('')
   const [isDataLoading, setIsDataLoading] = useState(true)
   const [dataError, setDataError] = useState<string | null>(null)
 
@@ -91,18 +97,20 @@ function App() {
     async function loadData() {
       setIsDataLoading(true)
 
-      const [clientsResponse, projectsResponse, timeEntriesResponse, invoicesResponse] = await Promise.all([
+      const [clientsResponse, projectsResponse, timeEntriesResponse, invoicesResponse, settingsResponse] = await Promise.all([
         supabase.from('clients').select('*'),
         supabase.from('projects').select('*'),
         supabase.from('time_entries').select('*'),
         supabase.from('invoices').select('*'),
+        supabase.from('user_settings').select('*').maybeSingle(),
       ])
 
       const firstError =
         clientsResponse.error ??
         projectsResponse.error ??
         timeEntriesResponse.error ??
-        invoicesResponse.error
+        invoicesResponse.error ??
+        settingsResponse.error
 
       if (firstError) {
         if (isActive) {
@@ -121,6 +129,12 @@ function App() {
       setProjects((projectsResponse.data as ProjectRow[]).map(mapProjectRow))
       setTimeEntries((timeEntriesResponse.data as TimeEntryRow[]).map(mapTimeEntryRow))
       setInvoices((invoicesResponse.data as InvoiceRow[]).map(mapInvoiceRow))
+
+      if (settingsResponse.data) {
+        const { settings, logoSrc: loadedLogoSrc } = mapUserSettingsRow(settingsResponse.data as UserSettingsRow)
+        setCompanySettings(settings)
+        setLogoSrc(loadedLogoSrc)
+      }
       setDataError(null)
       setIsDataLoading(false)
     }
@@ -339,7 +353,17 @@ function App() {
 
   function renderActiveView(userId: string) {
     if (activeView === 'settings') {
-      return <SettingsView userId={userId} />
+      return (
+        <SettingsView
+          userId={userId}
+          initialSettings={companySettings}
+          initialLogoSrc={logoSrc}
+          onSaved={(newSettings, newLogoSrc) => {
+            setCompanySettings(newSettings)
+            setLogoSrc(newLogoSrc)
+          }}
+        />
+      )
     }
 
     if (activeView === 'dashboard') {
@@ -379,6 +403,8 @@ function App() {
           projects={projects}
           timeEntries={timeEntries}
           userId={userId}
+          logoSrc={logoSrc}
+          companySettings={companySettings}
         />
       )
     }
@@ -409,6 +435,8 @@ function App() {
           projects={projects}
           timeEntries={timeEntries}
           userId={userId}
+          logoSrc={logoSrc}
+          companySettings={companySettings}
           onGenerateInvoice={handleGenerateInvoice}
         />
       </div>
@@ -430,7 +458,7 @@ function App() {
       <div className="mx-auto flex max-w-7xl flex-col gap-8">
         <header className="rounded-[2rem] border-2 border-slate-400 bg-white/90 px-6 py-8 shadow-sm shadow-slate-300/70 backdrop-blur sm:px-8">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-500">ERP</span>
+            <span className="text-xs text-slate-500"></span>
             <div className="flex items-center gap-3">
               <span className="text-sm text-slate-700">
                 {session.user.user_metadata?.name ?? session.user.email}

@@ -94,3 +94,41 @@ export interface InvoiceRow {
     total_amount: number
     status: InvoiceStatus
 }
+
+export type CompanySettings = {
+    name: string
+    businessId: string
+    email: string
+    phone: string
+    street: string
+    city: string
+    iban: string
+    bic: string
+    paymentTerms: string
+}
+
+export const defaultCompanySettings: CompanySettings = {
+    name: '',
+    businessId: '',
+    email: '',
+    phone: '',
+    street: '',
+    city: '',
+    iban: '',
+    bic: '',
+    paymentTerms: '',
+}
+
+export interface UserSettingsRow {
+    user_id: string
+    company_name: string
+    business_id: string
+    email: string
+    phone: string
+    street: string
+    city: string
+    iban: string
+    bic: string
+    payment_terms: string
+    logo_data_url: string
+}

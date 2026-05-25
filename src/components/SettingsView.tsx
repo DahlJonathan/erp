@@ -1,44 +1,8 @@
 import { useState } from 'react'
 
-export const COMPANY_SETTINGS_KEY = 'company_settings'
-export const LOGO_KEY = 'invoice_logo'
-
-function settingsKey(userId: string) { return `${COMPANY_SETTINGS_KEY}:${userId}` }
-function logoKey(userId: string) { return `${LOGO_KEY}:${userId}` }
-
-export type CompanySettings = {
-    name: string
-    businessId: string
-    email: string
-    phone: string
-    street: string
-    city: string
-    iban: string
-    bic: string
-    paymentTerms: string
-}
-
-export const defaultCompanySettings: CompanySettings = {
-    name: '',
-    businessId: '',
-    email: '',
-    phone: '',
-    street: '',
-    city: '',
-    iban: '',
-    bic: '',
-    paymentTerms: '',
-}
-
-export function loadCompanySettings(userId: string): CompanySettings {
-    try {
-        const raw = localStorage.getItem(settingsKey(userId))
-        if (!raw) return { ...defaultCompanySettings }
-        return { ...defaultCompanySettings, ...JSON.parse(raw) }
-    } catch {
-        return { ...defaultCompanySettings }
-    }
-}
+import { toUserSettingsUpsert } from '../data/supabaseMappers'
+import { supabase } from '../supabaseClient'
+import type { CompanySettings } from '../types/types'
 
 const fields: Array<{ key: keyof CompanySettings; label: string; placeholder: string; colSpan?: boolean }> = [
     { key: 'name', label: 'Yrityksen nimi', placeholder: 'Esim. Iisiduuni Oy', colSpan: true },
@@ -52,10 +16,19 @@ const fields: Array<{ key: keyof CompanySettings; label: string; placeholder: st
     { key: 'paymentTerms', label: 'Maksuehdot', placeholder: '14 päivää netto', colSpan: true },
 ]
 
-export function SettingsView({ userId }: { userId: string }) {
-    const [settings, setSettings] = useState<CompanySettings>(() => loadCompanySettings(userId))
-    const [logoSrc, setLogoSrc] = useState<string>(() => localStorage.getItem(logoKey(userId)) ?? '')
+type SettingsViewProps = {
+    userId: string
+    initialSettings: CompanySettings
+    initialLogoSrc: string
+    onSaved: (settings: CompanySettings, logoSrc: string) => void
+}
+
+export function SettingsView({ userId, initialSettings, initialLogoSrc, onSaved }: SettingsViewProps) {
+    const [settings, setSettings] = useState<CompanySettings>(initialSettings)
+    const [logoSrc, setLogoSrc] = useState<string>(initialLogoSrc)
+    const [isSaving, setIsSaving] = useState(false)
     const [saved, setSaved] = useState(false)
+    const [saveError, setSaveError] = useState<string | null>(null)
     const [logoError, setLogoError] = useState<string | null>(null)
 
     function handleChange(field: keyof CompanySettings, value: string) {
@@ -63,9 +36,23 @@ export function SettingsView({ userId }: { userId: string }) {
         setSaved(false)
     }
 
-    function handleSave() {
-        localStorage.setItem(settingsKey(userId), JSON.stringify(settings))
+    async function handleSave() {
+        setIsSaving(true)
+        setSaveError(null)
+
+        const { error } = await supabase
+            .from('user_settings')
+            .upsert([toUserSettingsUpsert(userId, settings, logoSrc)], { onConflict: 'user_id' })
+
+        setIsSaving(false)
+
+        if (error) {
+            setSaveError(error.message)
+            return
+        }
+
         setSaved(true)
+        onSaved(settings, logoSrc)
     }
 
     function handleLogoUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -80,17 +67,16 @@ export function SettingsView({ userId }: { userId: string }) {
         setLogoError(null)
         const reader = new FileReader()
         reader.onload = () => {
-            const dataUrl = reader.result as string
-            localStorage.setItem(logoKey(userId), dataUrl)
-            setLogoSrc(dataUrl)
+            setLogoSrc(reader.result as string)
+            setSaved(false)
         }
         reader.readAsDataURL(file)
         event.target.value = ''
     }
 
     function handleLogoRemove() {
-        localStorage.removeItem(logoKey(userId))
         setLogoSrc('')
+        setSaved(false)
     }
 
     return (
@@ -124,13 +110,17 @@ export function SettingsView({ userId }: { userId: string }) {
                     <div className="mt-6 flex items-center gap-4">
                         <button
                             type="button"
-                            onClick={handleSave}
-                            className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                            onClick={() => void handleSave()}
+                            disabled={isSaving}
+                            className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
                         >
-                            Tallenna tiedot
+                            {isSaving ? 'Tallennetaan...' : 'Tallenna tiedot'}
                         </button>
                         {saved ? (
                             <span className="text-sm font-medium text-emerald-600">✓ Tallennettu!</span>
+                        ) : null}
+                        {saveError ? (
+                            <span className="text-sm text-rose-600">{saveError}</span>
                         ) : null}
                     </div>
                 </article>
@@ -167,6 +157,7 @@ export function SettingsView({ userId }: { userId: string }) {
                                     Poista
                                 </button>
                             </div>
+                            <p className="text-xs text-slate-400">Muista tallentaa tiedot logon vaihdon jälkeen.</p>
                         </div>
                     ) : (
                         <div className="mt-5 flex flex-col gap-3">
