@@ -33,6 +33,7 @@ export interface Project {
     hourlyRate: number
     budgetHours: number
     status: ProjectStatus
+    dueDate: string | null
 }
 
 export type NewProject = Omit<Project, 'id'>
@@ -44,6 +45,7 @@ export interface ProjectRow {
     hourly_rate: number
     budget_hours: number
     status: ProjectStatus
+    due_date: string | null
 }
 
 export type TimeEntryStatus = 'draft' | 'approved' | 'invoiced'

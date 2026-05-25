@@ -15,6 +15,7 @@ import {
   mapClientRow,
   mapInvoiceRow,
   mapProjectRow,
+  mapTaskRow,
   mapTimeEntryRow,
   mapUserSettingsRow,
   toClientInsert,
@@ -36,6 +37,8 @@ import type {
   NewTimeEntry,
   Project,
   ProjectRow,
+  Task,
+  TaskRow,
   TimeEntry,
   TimeEntryRow,
   UserSettingsRow,
@@ -73,6 +76,7 @@ function App() {
   const [projects, setProjects] = useState<Project[]>([])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [tasks, setTasks] = useState<Task[]>([])
   const [companySettings, setCompanySettings] = useState<CompanySettings>(defaultCompanySettings)
   const [logoSrc, setLogoSrc] = useState<string>('')
   const [isDataLoading, setIsDataLoading] = useState(true)
@@ -97,12 +101,13 @@ function App() {
     async function loadData() {
       setIsDataLoading(true)
 
-      const [clientsResponse, projectsResponse, timeEntriesResponse, invoicesResponse, settingsResponse] = await Promise.all([
+      const [clientsResponse, projectsResponse, timeEntriesResponse, invoicesResponse, settingsResponse, tasksResponse] = await Promise.all([
         supabase.from('clients').select('*'),
         supabase.from('projects').select('*'),
         supabase.from('time_entries').select('*'),
         supabase.from('invoices').select('*'),
         supabase.from('user_settings').select('*').maybeSingle(),
+        supabase.from('tasks').select('*').order('due_date', { ascending: true, nullsFirst: false }),
       ])
 
       const firstError =
@@ -110,7 +115,8 @@ function App() {
         projectsResponse.error ??
         timeEntriesResponse.error ??
         invoicesResponse.error ??
-        settingsResponse.error
+        settingsResponse.error ??
+        tasksResponse.error
 
       if (firstError) {
         if (isActive) {
@@ -129,6 +135,7 @@ function App() {
       setProjects((projectsResponse.data as ProjectRow[]).map(mapProjectRow))
       setTimeEntries((timeEntriesResponse.data as TimeEntryRow[]).map(mapTimeEntryRow))
       setInvoices((invoicesResponse.data as InvoiceRow[]).map(mapInvoiceRow))
+      setTasks((tasksResponse.data as TaskRow[]).map(mapTaskRow))
 
       if (settingsResponse.data) {
         const { settings, logoSrc: loadedLogoSrc } = mapUserSettingsRow(settingsResponse.data as UserSettingsRow)
@@ -189,7 +196,7 @@ function App() {
 
   async function handleUpdateProject(
     projectId: string,
-    updatedData: Pick<Project, 'name' | 'hourlyRate' | 'budgetHours' | 'status'>,
+    updatedData: Pick<Project, 'name' | 'hourlyRate' | 'budgetHours' | 'status' | 'dueDate'>,
   ) {
     const { data, error } = await supabase
       .from('projects')
@@ -198,6 +205,7 @@ function App() {
         hourly_rate: updatedData.hourlyRate,
         budget_hours: updatedData.budgetHours,
         status: updatedData.status,
+        due_date: updatedData.dueDate ?? null,
       })
       .eq('id', projectId)
       .select('*')
@@ -367,7 +375,7 @@ function App() {
     }
 
     if (activeView === 'dashboard') {
-      return <Dashboard projects={projects} timeEntries={timeEntries} />
+      return <Dashboard projects={projects} timeEntries={timeEntries} tasks={tasks} />
     }
 
     if (activeView === 'tracker') {

@@ -12,7 +12,7 @@ type ProjectListProps = {
     errorMessage?: string | null
     onUpdateProject: (
         projectId: string,
-        updatedData: Pick<Project, 'name' | 'hourlyRate' | 'budgetHours' | 'status'>,
+        updatedData: Pick<Project, 'name' | 'hourlyRate' | 'budgetHours' | 'status' | 'dueDate'>,
     ) => Promise<void>
     onDeleteProject: (projectId: string) => Promise<void>
 }
@@ -22,6 +22,7 @@ type EditProjectFormState = {
     hourlyRate: string
     budgetHours: string
     status: ProjectStatus
+    dueDate: string
 }
 
 const projectStatusOptions: Array<{ value: ProjectStatus; label: string }> = [
@@ -80,6 +81,7 @@ export function ProjectList({
         hourlyRate: '',
         budgetHours: '',
         status: 'planned',
+        dueDate: '',
     });
 
     useEffect(() => {
@@ -106,6 +108,7 @@ export function ProjectList({
             hourlyRate: String(project.hourlyRate),
             budgetHours: String(project.budgetHours),
             status: project.status,
+            dueDate: project.dueDate ?? '',
         })
     }
 
@@ -151,6 +154,7 @@ export function ProjectList({
                 hourlyRate,
                 budgetHours,
                 status: editFormState.status,
+                dueDate: editFormState.dueDate || null,
             })
             closeEditModal()
         } catch (error) {
@@ -470,6 +474,19 @@ export function ProjectList({
                                         </div>
                                     ) : null}
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="text-sm font-semibold text-slate-700" htmlFor="edit-project-due-date">
+                                    Määräaika
+                                </label>
+                                <input
+                                    id="edit-project-due-date"
+                                    type="date"
+                                    value={editFormState.dueDate}
+                                    onChange={(event) => handleEditFieldChange('dueDate', event.target.value)}
+                                    className="mt-2 w-full rounded-xl border-2 border-gray-500 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-slate-950"
+                                />
                             </div>
 
                             <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">

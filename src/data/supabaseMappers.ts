@@ -54,6 +54,7 @@ export function mapProjectRow(row: ProjectRow): Project {
         hourlyRate: row.hourly_rate,
         budgetHours: row.budget_hours,
         status: row.status,
+        dueDate: row.due_date ?? null,
     }
 }
 
@@ -64,6 +65,7 @@ export function toProjectInsert(project: NewProject) {
         hourly_rate: project.hourlyRate,
         budget_hours: project.budgetHours,
         status: project.status,
+        due_date: project.dueDate ?? null,
     }
 }
 

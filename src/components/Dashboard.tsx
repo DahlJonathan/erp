@@ -1,14 +1,15 @@
 import { useMemo } from 'react'
 
-import type { Project, TimeEntry } from '../types/types'
+import type { Project, Task, TimeEntry } from '../types/types'
 import { getCurrentMonthKey } from '../utils/date'
 
 type DashboardProps = {
     projects: Project[]
     timeEntries: TimeEntry[]
+    tasks: Task[]
 }
 
-export function Dashboard({ projects, timeEntries }: DashboardProps) {
+export function Dashboard({ projects, timeEntries, tasks }: DashboardProps) {
     const currentMonth = getCurrentMonthKey()
     const projectById = useMemo(
         () => new Map(projects.map((project) => [project.id, project])),
@@ -48,6 +49,19 @@ export function Dashboard({ projects, timeEntries }: DashboardProps) {
             overBudget: usedHours > project.budgetHours,
         }
     })
+
+    const today = new Date().toISOString().slice(0, 10)
+    const outstandingTasks = useMemo(
+        () => tasks
+            .filter((t) => t.status === 'todo' || t.status === 'in_progress')
+            .sort((a, b) => {
+                if (a.dueDate === null && b.dueDate === null) return 0
+                if (a.dueDate === null) return 1
+                if (b.dueDate === null) return -1
+                return a.dueDate.localeCompare(b.dueDate)
+            }),
+        [tasks],
+    )
 
     return (
         <section className="rounded-[2rem] border-2 border-slate-400 bg-white/95 p-6 shadow-sm shadow-slate-300/60">
@@ -236,6 +250,59 @@ export function Dashboard({ projects, timeEntries }: DashboardProps) {
                         </div>
                     ))}
                 </div>
+            </article>
+
+            <article className="mt-6 rounded-3xl border-2 border-slate-400 bg-slate-50 p-5">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                    Tehtävät
+                </p>
+                <h3 className="mt-2 text-xl font-semibold text-slate-950">
+                    Avoimet tehtävät
+                </h3>
+
+                {outstandingTasks.length === 0 ? (
+                    <p className="mt-6 text-sm text-slate-500">Ei avoimia tehtäviä. Hienoa!</p>
+                ) : (
+                    <div className="mt-6 space-y-3">
+                        {outstandingTasks.map((task) => {
+                            const projectName = projectById.get(task.projectId)?.name ?? ''
+                            const isOverdue = task.dueDate !== null && task.dueDate < today
+                            return (
+                                <div
+                                    key={task.id}
+                                    className="flex flex-col gap-2 rounded-2xl border-2 border-slate-300 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
+                                >
+                                    <div>
+                                        <p className="font-semibold text-slate-950">{task.title}</p>
+                                        {projectName ? (
+                                            <p className="text-sm text-slate-500">{projectName}</p>
+                                        ) : null}
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span
+                                            className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                                                task.status === 'in_progress'
+                                                    ? 'border-sky-400 bg-sky-100 text-sky-800'
+                                                    : 'border-slate-400 bg-slate-100 text-slate-700'
+                                            }`}
+                                        >
+                                            {task.status === 'in_progress' ? 'Työn alla' : 'Tekemättä'}
+                                        </span>
+                                        {task.dueDate !== null ? (
+                                            <span
+                                                className={`text-sm font-medium ${
+                                                    isOverdue ? 'text-rose-600' : 'text-slate-600'
+                                                }`}
+                                            >
+                                                {isOverdue ? 'Myöhässä: ' : ''}{task.dueDate}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
             </article>
         </section>
     )
