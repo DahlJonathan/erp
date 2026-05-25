@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Check, ChevronDown, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, ClipboardList, Trash2 } from 'lucide-react'
 
+import { ProjectTasks } from './ProjectTasks'
 import type { Client, Project, ProjectStatus } from '../types/types'
 
 type ProjectListProps = {
     clients: Client[]
     projects: Project[]
+    userId: string
     isLoading?: boolean
     errorMessage?: string | null
     onUpdateProject: (
@@ -56,6 +58,7 @@ const statusConfig: Record<ProjectStatus, { label: string; className: string }> 
 export function ProjectList({
     clients,
     projects,
+    userId,
     isLoading = false,
     errorMessage = null,
     onUpdateProject,
@@ -71,6 +74,7 @@ export function ProjectList({
     const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false)
     const [filterStatus, setFilterStatus] = useState<ProjectStatus | 'all'>('all')
     const [confirmDeleteProject, setConfirmDeleteProject] = useState<Project | null>(null)
+    const [expandedTasksProjectId, setExpandedTasksProjectId] = useState<string | null>(null)
     const [editFormState, setEditFormState] = useState<EditProjectFormState>({
         name: '',
         hourlyRate: '',
@@ -253,67 +257,89 @@ export function ProjectList({
                             return (
                                 <article
                                     key={project.id}
-                                    className="grid gap-4 rounded-2xl border-2 border-gray-500 bg-slate-50 p-5 md:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))_auto] md:items-center"
+                                    className="rounded-2xl border-2 border-gray-500 bg-slate-50"
                                 >
-                                    <div>
-                                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                                            Asiakas
-                                        </p>
-                                        <p className="mt-2 text-lg font-semibold text-slate-900">
-                                            {client?.name ?? 'Tuntematon asiakas'}
-                                        </p>
-                                        <p className="text-sm text-slate-600">{project.name}</p>
+                                    <div className="grid gap-4 p-5 md:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))_auto] md:items-center">
+                                        <div>
+                                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                                                Asiakas
+                                            </p>
+                                            <p className="mt-2 text-lg font-semibold text-slate-900">
+                                                {client?.name ?? 'Tuntematon asiakas'}
+                                            </p>
+                                            <p className="text-sm text-slate-600">{project.name}</p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                                                Tuntihinta
+                                            </p>
+                                            <p className="mt-2 text-base font-medium text-slate-900">
+                                                {project.hourlyRate} EUR / h
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                                                Budjetti
+                                            </p>
+                                            <p className="mt-2 text-base font-medium text-slate-900">
+                                                {project.budgetHours} h
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                                                Tila
+                                            </p>
+                                            <span
+                                                className={`mt-2 inline-flex rounded-full px-3 py-1 text-sm font-medium ring-1 ring-inset ${status.className}`}
+                                            >
+                                                {status.label}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex flex-wrap justify-start gap-3 md:justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={() => setExpandedTasksProjectId(
+                                                    expandedTasksProjectId === project.id ? null : project.id
+                                                )}
+                                                className={`inline-flex items-center gap-2 rounded-xl border-2 px-4 py-2 text-sm font-semibold transition ${
+                                                    expandedTasksProjectId === project.id
+                                                        ? 'border-slate-950 bg-slate-950 text-white'
+                                                        : 'border-gray-500 bg-white text-slate-700 hover:bg-slate-100'
+                                                }`}
+                                            >
+                                                <ClipboardList size={15} />
+                                                Tehtävät
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => openEditModal(project)}
+                                                disabled={isDeleting}
+                                                className="rounded-xl border-2 border-gray-500 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                Muokkaa
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDeleteClick(project)}
+                                                disabled={isDeleting}
+                                                className="inline-flex items-center gap-2 rounded-xl border-2 border-gray-500 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                aria-label={`Poista projekti ${project.name}`}
+                                            >
+                                                <Trash2 size={16} aria-hidden="true" />
+                                                {isDeleting ? 'Poistetaan...' : 'Poista'}
+                                            </button>
+                                        </div>
                                     </div>
 
-                                    <div>
-                                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                                            Tuntihinta
-                                        </p>
-                                        <p className="mt-2 text-base font-medium text-slate-900">
-                                            {project.hourlyRate} EUR / h
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                                            Budjetti
-                                        </p>
-                                        <p className="mt-2 text-base font-medium text-slate-900">
-                                            {project.budgetHours} h
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                                            Tila
-                                        </p>
-                                        <span
-                                            className={`mt-2 inline-flex rounded-full px-3 py-1 text-sm font-medium ring-1 ring-inset ${status.className}`}
-                                        >
-                                            {status.label}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex flex-wrap justify-start gap-3 md:justify-end">
-                                        <button
-                                            type="button"
-                                            onClick={() => openEditModal(project)}
-                                            disabled={isDeleting}
-                                            className="rounded-xl border-2 border-gray-500 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                                        >
-                                            Muokkaa
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleDeleteClick(project)}
-                                            disabled={isDeleting}
-                                            className="inline-flex items-center gap-2 rounded-xl border-2 border-gray-500 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                            aria-label={`Poista projekti ${project.name}`}
-                                        >
-                                            <Trash2 size={16} aria-hidden="true" />
-                                            {isDeleting ? 'Poistetaan...' : 'Poista'}
-                                        </button>
-                                    </div>
+                                    {expandedTasksProjectId === project.id ? (
+                                        <div className="border-t-2 border-slate-200 p-5 pt-4 md:col-span-5">
+                                            <ProjectTasks projectId={project.id} userId={userId} />
+                                        </div>
+                                    ) : null}
                                 </article>
                             )
                         })}

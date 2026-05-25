@@ -6,9 +6,12 @@ import type {
     InvoiceRow,
     NewClient,
     NewProject,
+    NewTask,
     NewTimeEntry,
     Project,
     ProjectRow,
+    Task,
+    TaskRow,
     TimeEntry,
     TimeEntryRow,
     UserSettingsRow,
@@ -141,5 +144,29 @@ export function toUserSettingsUpsert(userId: string, settings: CompanySettings, 
         payment_terms: settings.paymentTerms,
         logo_data_url: logoSrc,
         updated_at: new Date().toISOString(),
+    }
+}
+
+export function mapTaskRow(row: TaskRow): Task {
+    return {
+        id: row.id,
+        projectId: row.project_id,
+        userId: row.user_id,
+        title: row.title,
+        description: row.description,
+        status: row.status,
+        dueDate: row.due_date ?? null,
+        createdAt: row.created_at,
+    }
+}
+
+export function toTaskInsert(task: NewTask) {
+    return {
+        project_id: task.projectId,
+        user_id: task.userId,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        due_date: task.dueDate ?? null,
     }
 }

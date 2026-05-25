@@ -386,6 +386,7 @@ function App() {
           <ProjectList
             clients={clients}
             projects={projects}
+            userId={userId}
             isLoading={isDataLoading}
             errorMessage={dataError}
             onUpdateProject={handleUpdateProject}

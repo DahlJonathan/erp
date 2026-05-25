@@ -132,3 +132,29 @@ export interface UserSettingsRow {
     payment_terms: string
     logo_data_url: string
 }
+
+export type TaskStatus = 'todo' | 'in_progress' | 'done'
+
+export interface Task {
+    id: string
+    projectId: string
+    userId: string
+    title: string
+    description: string
+    status: TaskStatus
+    dueDate: string | null
+    createdAt: string
+}
+
+export type NewTask = Omit<Task, 'id' | 'createdAt'>
+
+export interface TaskRow {
+    id: string
+    project_id: string
+    user_id: string
+    title: string
+    description: string
+    status: TaskStatus
+    due_date: string | null
+    created_at: string
+}
