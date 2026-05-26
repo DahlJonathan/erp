@@ -241,6 +241,14 @@ function App() {
     )
   }
 
+  function handleTaskChange(action: 'created' | 'updated' | 'deleted', task: Task) {
+    setTasks((prev) => {
+      if (action === 'created') return [...prev, task]
+      if (action === 'updated') return prev.map((t) => (t.id === task.id ? task : t))
+      return prev.filter((t) => t.id !== task.id)
+    })
+  }
+
   async function handleAddClient(client: NewClient) {
     const { data, error } = await supabase
       .from('clients')
@@ -399,6 +407,7 @@ function App() {
             errorMessage={dataError}
             onUpdateProject={handleUpdateProject}
             onDeleteProject={handleDeleteProject}
+            onTaskChange={handleTaskChange}
           />
         </div>
       )

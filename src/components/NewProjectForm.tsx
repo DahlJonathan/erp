@@ -267,19 +267,6 @@ export function NewProjectForm({ clients, onCreateProject }: NewProjectFormProps
                         />
                     </label>
 
-                    <label className="block sm:col-span-2">
-                        <span className="mb-1 block text-sm font-medium text-slate-700">
-                            Määräaika
-                        </span>
-                        <input
-                            type="date"
-                            value={projectFormState.dueDate}
-                            onChange={(event) => handleProjectFieldChange('dueDate', event.target.value)}
-                            disabled={isSavingProject}
-                            className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
-                        />
-                    </label>
-
                     {projectErrorMessage ? (
                         <div className="sm:col-span-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                             {projectErrorMessage}

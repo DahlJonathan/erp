@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, Pencil, Plus, Trash2, X } from 'lucide-react'
 
 import { mapTaskRow, toTaskInsert } from '../data/supabaseMappers'
 import { supabase } from '../supabaseClient'
@@ -8,6 +8,7 @@ import type { Task, TaskRow, TaskStatus } from '../types/types'
 type ProjectTasksProps = {
     projectId: string
     userId: string
+    onTaskChange?: (action: 'created' | 'updated' | 'deleted', task: Task) => void
 }
 
 type NewTaskForm = {
@@ -83,7 +84,26 @@ async function deleteTask(taskId: string): Promise<void> {
     if (error) throw new Error(error.message)
 }
 
-export function ProjectTasks({ projectId, userId }: ProjectTasksProps) {
+async function updateTask(
+    taskId: string,
+    fields: { title: string; description: string; dueDate: string | null },
+): Promise<Task> {
+    const { data, error } = await supabase
+        .from('tasks')
+        .update({
+            title: fields.title,
+            description: fields.description,
+            due_date: fields.dueDate,
+        })
+        .eq('id', taskId)
+        .select('*')
+        .single()
+
+    if (error) throw new Error(error.message)
+    return mapTaskRow(data as TaskRow)
+}
+
+export function ProjectTasks({ projectId, userId, onTaskChange }: ProjectTasksProps) {
     const [tasks, setTasks] = useState<Task[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [loadError, setLoadError] = useState<string | null>(null)
@@ -94,6 +114,9 @@ export function ProjectTasks({ projectId, userId }: ProjectTasksProps) {
 
     const [updatingId, setUpdatingId] = useState<string | null>(null)
     const [deletingId, setDeletingId] = useState<string | null>(null)
+    const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+    const [editForm, setEditForm] = useState<NewTaskForm>(emptyForm)
+    const [isSavingEdit, setIsSavingEdit] = useState(false)
 
     useEffect(() => {
         let isActive = true
@@ -134,6 +157,7 @@ export function ProjectTasks({ projectId, userId }: ProjectTasksProps) {
                 dueDate: form.dueDate || null,
             })
             setTasks((prev) => [...prev, created])
+            onTaskChange?.('created', created)
             setForm(emptyForm)
         } catch (err: unknown) {
             setFormError(err instanceof Error ? err.message : 'Luonti epäonnistui.')
@@ -142,11 +166,45 @@ export function ProjectTasks({ projectId, userId }: ProjectTasksProps) {
         }
     }
 
+    function handleStartEdit(task: Task) {
+        setEditingTaskId(task.id)
+        setEditForm({
+            title: task.title,
+            description: task.description,
+            dueDate: task.dueDate ?? '',
+        })
+    }
+
+    function handleCancelEdit() {
+        setEditingTaskId(null)
+        setEditForm(emptyForm)
+    }
+
+    async function handleSaveEdit(task: Task) {
+        if (!editForm.title.trim()) return
+        setIsSavingEdit(true)
+        try {
+            const updated = await updateTask(task.id, {
+                title: editForm.title.trim(),
+                description: editForm.description.trim(),
+                dueDate: editForm.dueDate || null,
+            })
+            setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)))
+            onTaskChange?.('updated', updated)
+            setEditingTaskId(null)
+        } catch {
+            // keep editing on error
+        } finally {
+            setIsSavingEdit(false)
+        }
+    }
+
     async function handleStatusChange(task: Task, newStatus: TaskStatus) {
         setUpdatingId(task.id)
         try {
             const updated = await updateTaskStatus(task.id, newStatus)
             setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)))
+            onTaskChange?.('updated', updated)
         } catch {
             // status stays unchanged on error
         } finally {
@@ -158,7 +216,11 @@ export function ProjectTasks({ projectId, userId }: ProjectTasksProps) {
         setDeletingId(taskId)
         try {
             await deleteTask(taskId)
-            setTasks((prev) => prev.filter((t) => t.id !== taskId))
+            setTasks((prev) => {
+                const removed = prev.find((t) => t.id === taskId)
+                if (removed) onTaskChange?.('deleted', removed)
+                return prev.filter((t) => t.id !== taskId)
+            })
         } catch {
             // keep task on error
         } finally {
@@ -182,14 +244,14 @@ export function ProjectTasks({ projectId, userId }: ProjectTasksProps) {
             {/* Create form */}
             <form onSubmit={(e) => void handleCreate(e)} className="mt-5 rounded-2xl border-2 border-slate-300 bg-white p-4">
                 <p className="mb-3 text-sm font-medium text-slate-700">Uusi tehtävä</p>
-                <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                <div className="flex flex-wrap items-center gap-3">
                     <input
                         type="text"
                         placeholder="Tehtävän otsikko"
                         value={form.title}
                         onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                         required
-                        className="w-full rounded-xl border-2 border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950 focus:ring-4 focus:ring-slate-950/10"
+                        className="w-48 min-w-0 rounded-xl border-2 border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950 focus:ring-4 focus:ring-slate-950/10"
                     />
                     <input
                         type="date"
@@ -197,6 +259,15 @@ export function ProjectTasks({ projectId, userId }: ProjectTasksProps) {
                         onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))}
                         className="rounded-xl border-2 border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950 focus:ring-4 focus:ring-slate-950/10"
                     />
+                    <button
+                        type="submit"
+                        disabled={isSubmitting || !form.title.trim()}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+                    >
+                        <Plus size={14} />
+                        {isSubmitting ? 'Lisätään...' : 'Lisää'}
+                    </button>
+                    {formError ? <span className="text-sm text-rose-600">{formError}</span> : null}
                 </div>
                 <textarea
                     placeholder="Kuvaus (valinnainen)"
@@ -205,17 +276,6 @@ export function ProjectTasks({ projectId, userId }: ProjectTasksProps) {
                     rows={2}
                     className="mt-3 w-full resize-none rounded-xl border-2 border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950 focus:ring-4 focus:ring-slate-950/10"
                 />
-                <div className="mt-3 flex items-center gap-3">
-                    <button
-                        type="submit"
-                        disabled={isSubmitting || !form.title.trim()}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
-                    >
-                        <Plus size={14} />
-                        {isSubmitting ? 'Lisätään...' : 'Lisää tehtävä'}
-                    </button>
-                    {formError ? <span className="text-sm text-rose-600">{formError}</span> : null}
-                </div>
             </form>
 
             {/* Task list */}
@@ -244,78 +304,133 @@ export function ProjectTasks({ projectId, userId }: ProjectTasksProps) {
                                     {group.map((task) => (
                                         <li
                                             key={task.id}
-                                            className="flex items-start gap-3 rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 transition"
+                                            className="rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 transition"
                                         >
-                                            {/* Status cycle button */}
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    void handleStatusChange(
-                                                        task,
-                                                        config.nextStatus ?? 'todo',
-                                                    )
-                                                }
-                                                disabled={updatingId === task.id}
-                                                title={
-                                                    config.nextStatus
-                                                        ? `Merkitse: ${statusConfig[config.nextStatus].label}`
-                                                        : 'Merkitse tehtäväksi'
-                                                }
-                                                className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition ${
-                                                    task.status === 'done'
-                                                        ? 'border-emerald-500 bg-emerald-500 text-white'
-                                                        : task.status === 'in_progress'
-                                                          ? 'border-amber-400 bg-amber-100 text-amber-700'
-                                                          : 'border-slate-400 bg-white hover:border-slate-600'
-                                                } disabled:opacity-50`}
-                                            >
-                                                {task.status === 'done' ? (
-                                                    <Check size={11} strokeWidth={3} />
-                                                ) : task.status === 'in_progress' ? (
-                                                    <ChevronDown size={11} strokeWidth={2.5} />
-                                                ) : null}
-                                            </button>
+                                            {editingTaskId === task.id ? (
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={editForm.title}
+                                                            onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
+                                                            className="w-48 min-w-0 rounded-xl border-2 border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-950 outline-none transition focus:border-slate-950 focus:ring-4 focus:ring-slate-950/10"
+                                                        />
+                                                        <input
+                                                            type="date"
+                                                            value={editForm.dueDate}
+                                                            onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))}
+                                                            className="rounded-xl border-2 border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-950 outline-none transition focus:border-slate-950 focus:ring-4 focus:ring-slate-950/10"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => void handleSaveEdit(task)}
+                                                            disabled={isSavingEdit || !editForm.title.trim()}
+                                                            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+                                                        >
+                                                            <Check size={12} />
+                                                            {isSavingEdit ? 'Tallennetaan...' : 'Tallenna'}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleCancelEdit}
+                                                            className="flex-shrink-0 text-slate-400 transition hover:text-slate-700"
+                                                            title="Peruuta"
+                                                        >
+                                                            <X size={16} />
+                                                        </button>
+                                                    </div>
+                                                    <textarea
+                                                        value={editForm.description}
+                                                        onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                                                        placeholder="Kuvaus (valinnainen)"
+                                                        rows={2}
+                                                        className="w-full resize-none rounded-xl border-2 border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950 focus:ring-4 focus:ring-slate-950/10"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-start gap-3">
+                                                    {/* Status cycle button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            void handleStatusChange(
+                                                                task,
+                                                                config.nextStatus ?? 'todo',
+                                                            )
+                                                        }
+                                                        disabled={updatingId === task.id}
+                                                        title={
+                                                            config.nextStatus
+                                                                ? `Merkitse: ${statusConfig[config.nextStatus].label}`
+                                                                : 'Merkitse tehtäväksi'
+                                                        }
+                                                        className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition ${
+                                                            task.status === 'done'
+                                                                ? 'border-emerald-500 bg-emerald-500 text-white'
+                                                                : task.status === 'in_progress'
+                                                                  ? 'border-amber-400 bg-amber-100 text-amber-700'
+                                                                  : 'border-slate-400 bg-white hover:border-slate-600'
+                                                        } disabled:opacity-50`}
+                                                    >
+                                                        {task.status === 'done' ? (
+                                                            <Check size={11} strokeWidth={3} />
+                                                        ) : task.status === 'in_progress' ? (
+                                                            <ChevronDown size={11} strokeWidth={2.5} />
+                                                        ) : null}
+                                                    </button>
 
-                                            <div className="min-w-0 flex-1">
-                                                <p
-                                                    className={`text-sm font-medium ${task.status === 'done' ? 'text-slate-400 line-through' : 'text-slate-950'}`}
-                                                >
-                                                    {task.title}
-                                                </p>
-                                                {task.description ? (
-                                                    <p className="mt-0.5 text-xs text-slate-500">{task.description}</p>
-                                                ) : null}
-                                                {task.dueDate ? (
-                                                    <p className="mt-1 text-xs text-slate-400">
-                                                        Eräpäivä: {task.dueDate}
-                                                    </p>
-                                                ) : null}
-                                            </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p
+                                                            className={`text-sm font-medium ${task.status === 'done' ? 'text-slate-400 line-through' : 'text-slate-950'}`}
+                                                        >
+                                                            {task.title}
+                                                        </p>
+                                                        {task.description ? (
+                                                            <p className="mt-0.5 text-xs text-slate-500">{task.description}</p>
+                                                        ) : null}
+                                                        {task.dueDate ? (
+                                                            <p className="mt-1 text-xs text-slate-400">
+                                                                Eräpäivä: {task.dueDate}
+                                                            </p>
+                                                        ) : null}
+                                                    </div>
 
-                                            {/* Status dropdown */}
-                                            <select
-                                                value={task.status}
-                                                disabled={updatingId === task.id}
-                                                onChange={(e) =>
-                                                    void handleStatusChange(task, e.target.value as TaskStatus)
-                                                }
-                                                className="rounded-xl border-2 border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700 outline-none transition focus:border-slate-950 disabled:opacity-50"
-                                            >
-                                                <option value="todo">Tehtävänä</option>
-                                                <option value="in_progress">Kesken</option>
-                                                <option value="done">Valmis</option>
-                                            </select>
+                                                    {/* Status dropdown */}
+                                                    <select
+                                                        value={task.status}
+                                                        disabled={updatingId === task.id}
+                                                        onChange={(e) =>
+                                                            void handleStatusChange(task, e.target.value as TaskStatus)
+                                                        }
+                                                        className="rounded-xl border-2 border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700 outline-none transition focus:border-slate-950 disabled:opacity-50"
+                                                    >
+                                                        <option value="todo">Tehtävänä</option>
+                                                        <option value="in_progress">Kesken</option>
+                                                        <option value="done">Valmis</option>
+                                                    </select>
 
-                                            {/* Delete */}
-                                            <button
-                                                type="button"
-                                                onClick={() => void handleDelete(task.id)}
-                                                disabled={deletingId === task.id}
-                                                className="mt-0.5 flex-shrink-0 text-slate-300 transition hover:text-rose-500 disabled:opacity-50"
-                                                title="Poista tehtävä"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
+                                                    {/* Edit */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleStartEdit(task)}
+                                                        className="mt-0.5 flex-shrink-0 text-slate-500 transition hover:text-slate-900"
+                                                        title="Muokkaa tehtävää"
+                                                    >
+                                                        <Pencil size={14} />
+                                                    </button>
+
+                                                    {/* Delete */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => void handleDelete(task.id)}
+                                                        disabled={deletingId === task.id}
+                                                        className="mt-0.5 flex-shrink-0 text-slate-500 transition hover:text-rose-900 disabled:opacity-50"
+                                                        title="Poista tehtävä"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            )}
                                         </li>
                                     ))}
                                 </ul>

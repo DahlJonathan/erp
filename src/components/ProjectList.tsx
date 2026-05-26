@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Check, ChevronDown, ClipboardList, Trash2 } from 'lucide-react'
 
 import { ProjectTasks } from './ProjectTasks'
-import type { Client, Project, ProjectStatus } from '../types/types'
+import type { Client, Project, ProjectStatus, Task } from '../types/types'
 
 type ProjectListProps = {
     clients: Client[]
@@ -15,6 +15,7 @@ type ProjectListProps = {
         updatedData: Pick<Project, 'name' | 'hourlyRate' | 'budgetHours' | 'status' | 'dueDate'>,
     ) => Promise<void>
     onDeleteProject: (projectId: string) => Promise<void>
+    onTaskChange?: (action: 'created' | 'updated' | 'deleted', task: Task) => void
 }
 
 type EditProjectFormState = {
@@ -64,6 +65,7 @@ export function ProjectList({
     errorMessage = null,
     onUpdateProject,
     onDeleteProject,
+    onTaskChange,
 }: ProjectListProps) {
     const [isProjectListLoading, setIsProjectListLoading] = useState(isLoading)
     const [projectListError, setProjectListError] = useState<string | null>(errorMessage)
@@ -341,7 +343,7 @@ export function ProjectList({
 
                                     {expandedTasksProjectId === project.id ? (
                                         <div className="border-t-2 border-slate-200 p-5 pt-4 md:col-span-5">
-                                            <ProjectTasks projectId={project.id} userId={userId} />
+                                            <ProjectTasks projectId={project.id} userId={userId} onTaskChange={onTaskChange} />
                                         </div>
                                     ) : null}
                                 </article>
