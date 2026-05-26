@@ -83,7 +83,6 @@ type HistoriaProps = {
     invoices: Invoice[]
     projects: Project[]
     timeEntries: TimeEntry[]
-    userId: string
     logoSrc: string
     companySettings: CompanySettings
 }
@@ -103,7 +102,7 @@ const invoiceStatusLabels = {
     overdue: 'Myöhässä',
 } as const
 
-export function Historia({ clients, invoices, projects, timeEntries, userId, logoSrc, companySettings }: HistoriaProps) {
+export function Historia({ clients, invoices, projects, timeEntries, logoSrc, companySettings }: HistoriaProps) {
     const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
 
     const clientById = useMemo(

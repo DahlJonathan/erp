@@ -184,7 +184,7 @@ export function NewProjectForm({ clients, onCreateProject }: NewProjectFormProps
                     className="mt-6 mx-auto grid gap-x-4 gap-y-3 rounded-3xl border-2 border-slate-400 bg-slate-50 p-5 sm:grid-cols-6"
                     onSubmit={handleProjectSubmit}
                 >
-                    <label className="block sm:col-span-3">
+                    <label className="block sm:col-span-2">
                         <span className="mb-1 block text-sm font-medium text-slate-700">
                             Valitse asiakas
                         </span>
@@ -199,7 +199,7 @@ export function NewProjectForm({ clients, onCreateProject }: NewProjectFormProps
                             />
                     </label>
 
-                    <label className="block sm:col-span-3">
+                    <label className="block sm:col-span-2">
                         <span className="mb-1 block text-sm font-medium text-slate-700">
                             Projektin nimi
                         </span>
@@ -207,6 +207,19 @@ export function NewProjectForm({ clients, onCreateProject }: NewProjectFormProps
                             type="text"
                             value={projectFormState.name}
                             onChange={(event) => handleProjectFieldChange('name', event.target.value)}
+                            disabled={isSavingProject}
+                            className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        />
+                    </label>
+
+                    <label className="block sm:col-span-2">
+                        <span className="mb-1 block text-sm font-medium text-slate-700">
+                            Määräaika
+                        </span>
+                        <input
+                            type="date"
+                            value={projectFormState.dueDate}
+                            onChange={(event) => handleProjectFieldChange('dueDate', event.target.value)}
                             disabled={isSavingProject}
                             className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
                         />
@@ -252,19 +265,6 @@ export function NewProjectForm({ clients, onCreateProject }: NewProjectFormProps
                                 disabled={isSavingProject}
                                 options={projectStatusOptions}
                             />
-                    </label>
-
-                    <label className="block sm:col-span-2">
-                        <span className="mb-1 block text-sm font-medium text-slate-700">
-                            Määräaika
-                        </span>
-                        <input
-                            type="date"
-                            value={projectFormState.dueDate}
-                            onChange={(event) => handleProjectFieldChange('dueDate', event.target.value)}
-                            disabled={isSavingProject}
-                            className="w-full rounded-2xl border-2 border-slate-400 bg-white px-4 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
-                        />
                     </label>
 
                     {projectErrorMessage ? (

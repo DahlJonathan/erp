@@ -96,7 +96,6 @@ type InvoicingViewProps = {
     invoices: Invoice[]
     projects: Project[]
     timeEntries: TimeEntry[]
-    userId: string
     logoSrc: string
     companySettings: CompanySettings
     onGenerateInvoice: (clientId: string, entryIds: string[], totalAmount: number) => Promise<Invoice>
@@ -107,7 +106,6 @@ export function InvoicingView({
     invoices,
     projects,
     timeEntries,
-    userId,
     logoSrc,
     companySettings,
     onGenerateInvoice,

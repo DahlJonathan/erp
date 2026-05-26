@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react'
-import { Check, ChevronDown, ClipboardList, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Trash2 } from 'lucide-react'
 
 import { ProjectTasks } from './ProjectTasks'
-import type { Client, Project, ProjectStatus, Task } from '../types/types'
+import { mapProjectRow } from '../data/supabaseMappers'
+import { supabase } from '../supabaseClient'
+import type { Client, Project, ProjectRow, ProjectStatus, Task } from '../types/types'
+
+const PAGE_SIZE = 10
 
 type ProjectListProps = {
     clients: Client[]
-    projects: Project[]
     userId: string
-    isLoading?: boolean
-    errorMessage?: string | null
+    refreshTrigger?: number
     onUpdateProject: (
         projectId: string,
         updatedData: Pick<Project, 'name' | 'hourlyRate' | 'budgetHours' | 'status' | 'dueDate'>,
@@ -59,16 +61,19 @@ const statusConfig: Record<ProjectStatus, { label: string; className: string }> 
 
 export function ProjectList({
     clients,
-    projects,
     userId,
-    isLoading = false,
-    errorMessage = null,
+    refreshTrigger,
     onUpdateProject,
     onDeleteProject,
     onTaskChange,
 }: ProjectListProps) {
-    const [isProjectListLoading, setIsProjectListLoading] = useState(isLoading)
-    const [projectListError, setProjectListError] = useState<string | null>(errorMessage)
+    const [pagedProjects, setPagedProjects] = useState<Project[]>([])
+    const [totalCount, setTotalCount] = useState(0)
+    const [currentPage, setCurrentPage] = useState(1)
+    const [selectedClientId, setSelectedClientId] = useState<string>('all')
+    const [isPageLoading, setIsPageLoading] = useState(true)
+    const [pageError, setPageError] = useState<string | null>(null)
+
     const [editProjectId, setEditProjectId] = useState<string | null>(null)
     const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null)
     const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null)
@@ -84,22 +89,52 @@ export function ProjectList({
         budgetHours: '',
         status: 'planned',
         dueDate: '',
-    });
-
-    useEffect(() => {
-        setIsProjectListLoading(isLoading)
-    }, [isLoading])
-
-    useEffect(() => {
-        setProjectListError(errorMessage)
-    }, [errorMessage])
+    })
 
     const clientById = new Map(clients.map((client) => [client.id, client]))
-    const editingProject = projects.find((project) => project.id === editProjectId) ?? null
+    const editingProject = pagedProjects.find((project) => project.id === editProjectId) ?? null
+    const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
-    const filteredProjects = filterStatus === 'all'
-        ? projects
-        : projects.filter((project) => project.status === filterStatus)
+    const fetchPage = useCallback(async (
+        page: number,
+        clientId: string,
+        status: ProjectStatus | 'all',
+    ) => {
+        setIsPageLoading(true)
+        setPageError(null)
+
+        const from = (page - 1) * PAGE_SIZE
+        const to = from + PAGE_SIZE - 1
+
+        let query = supabase
+            .from('projects')
+            .select('*', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(from, to)
+
+        if (clientId !== 'all') query = query.eq('client_id', clientId)
+        if (status !== 'all') query = query.eq('status', status)
+
+        const { data, error, count } = await query
+
+        if (error) {
+            setPageError(error.message)
+            setIsPageLoading(false)
+            return
+        }
+
+        setPagedProjects((data as ProjectRow[]).map(mapProjectRow))
+        setTotalCount(count ?? 0)
+        setIsPageLoading(false)
+    }, [])
+
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [selectedClientId, filterStatus])
+
+    useEffect(() => {
+        void fetchPage(currentPage, selectedClientId, filterStatus)
+    }, [currentPage, selectedClientId, filterStatus, refreshTrigger, fetchPage])
 
     function openEditModal(project: Project) {
         setEditProjectId(project.id)
@@ -159,6 +194,7 @@ export function ProjectList({
                 dueDate: editFormState.dueDate || null,
             })
             closeEditModal()
+            void fetchPage(currentPage, selectedClientId, filterStatus)
         } catch (error) {
             setEditErrorMessage(
                 error instanceof Error ? error.message : 'Projektin päivittäminen epäonnistui.',
@@ -186,6 +222,11 @@ export function ProjectList({
             if (editProjectId === project.id) {
                 closeEditModal()
             }
+
+            // If we deleted the last item on a page, go back one
+            const newPage = pagedProjects.length === 1 && currentPage > 1 ? currentPage - 1 : currentPage
+            setCurrentPage(newPage)
+            void fetchPage(newPage, selectedClientId, filterStatus)
         } catch (error) {
             setDeleteErrorMessage(
                 error instanceof Error ? error.message : 'Projektin poistaminen epäonnistui.',
@@ -211,8 +252,22 @@ export function ProjectList({
                         <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                             Yhteensä
                         </p>
-                        <p className="text-2xl font-semibold text-slate-900">{filteredProjects.length} / {projects.length}</p>
+                        <p className="text-2xl font-semibold text-slate-900">{totalCount}</p>
                     </div>
+                </div>
+
+                {/* Client filter */}
+                <div className="mb-4">
+                    <select
+                        value={selectedClientId}
+                        onChange={(e) => setSelectedClientId(e.target.value)}
+                        className="rounded-xl border-2 border-gray-400 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-950"
+                    >
+                        <option value="all">Kaikki asiakkaat</option>
+                        {clients.map((client) => (
+                            <option key={client.id} value={client.id}>{client.name}</option>
+                        ))}
+                    </select>
                 </div>
 
                 <div className="mb-5 flex flex-wrap gap-2">
@@ -232,9 +287,9 @@ export function ProjectList({
                     ))}
                 </div>
 
-                {projectListError ? (
+                {pageError ? (
                     <div className="rounded-2xl border-2 border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                        Virhe projektien latauksessa: {projectListError}
+                        Virhe projektien latauksessa: {pageError}
                     </div>
                 ) : null}
 
@@ -244,18 +299,18 @@ export function ProjectList({
                     </div>
                 ) : null}
 
-                {isProjectListLoading && projects.length === 0 ? (
+                {isPageLoading ? (
                     <div className="rounded-2xl border-2 border-dashed border-gray-500 bg-slate-50 p-5 text-sm text-slate-700">
                         Ladataan projekteja...
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {filteredProjects.length === 0 ? (
+                        {pagedProjects.length === 0 ? (
                             <div className="rounded-2xl border-2 border-dashed border-gray-400 bg-slate-50 p-5 text-sm text-slate-600">
-                                Ei projekteja valitulla tilalla.
+                                Ei projekteja valituilla suodattimilla.
                             </div>
                         ) : null}
-                        {filteredProjects.map((project) => {
+                        {pagedProjects.map((project) => {
                             const client = clientById.get(project.clientId)
                             const status = statusConfig[project.status]
                             const isDeleting = deletingProjectId === project.id
@@ -351,6 +406,35 @@ export function ProjectList({
                         })}
                     </div>
                 )}
+
+                {/* Pagination */}
+                {totalPages > 1 ? (
+                    <div className="mt-5 flex items-center justify-between gap-4">
+                        <p className="text-sm text-slate-500">
+                            Sivu {currentPage} / {totalPages} &middot; {totalCount} projektia
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                disabled={currentPage === 1 || isPageLoading}
+                                className="inline-flex items-center gap-1 rounded-xl border-2 border-gray-400 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                <ChevronLeft size={15} />
+                                Edellinen
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages || isPageLoading}
+                                className="inline-flex items-center gap-1 rounded-xl border-2 border-gray-400 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                Seuraava
+                                <ChevronRight size={15} />
+                            </button>
+                        </div>
+                    </div>
+                ) : null}
             </section>
             {editingProject ? (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6">

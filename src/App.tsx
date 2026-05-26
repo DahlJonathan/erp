@@ -81,6 +81,7 @@ function App() {
   const [logoSrc, setLogoSrc] = useState<string>('')
   const [isDataLoading, setIsDataLoading] = useState(true)
   const [dataError, setDataError] = useState<string | null>(null)
+  const [projectListRefreshTrigger, setProjectListRefreshTrigger] = useState(0)
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
@@ -192,6 +193,7 @@ function App() {
     }
 
     setProjects((currentProjects) => [mapProjectRow(data as ProjectRow), ...currentProjects])
+    setProjectListRefreshTrigger((n) => n + 1)
   }
 
   async function handleUpdateProject(
@@ -367,7 +369,7 @@ function App() {
     return invoice
   }
 
-  function renderActiveView(userId: string) {
+  function renderActiveView() {
     if (activeView === 'settings') {
       return (
         <SettingsView
@@ -401,10 +403,8 @@ function App() {
           />
           <ProjectList
             clients={clients}
-            projects={projects}
             userId={userId}
-            isLoading={isDataLoading}
-            errorMessage={dataError}
+            refreshTrigger={projectListRefreshTrigger}
             onUpdateProject={handleUpdateProject}
             onDeleteProject={handleDeleteProject}
             onTaskChange={handleTaskChange}
@@ -420,7 +420,6 @@ function App() {
           invoices={invoices}
           projects={projects}
           timeEntries={timeEntries}
-          userId={userId}
           logoSrc={logoSrc}
           companySettings={companySettings}
         />
@@ -452,7 +451,6 @@ function App() {
           invoices={invoices}
           projects={projects}
           timeEntries={timeEntries}
-          userId={userId}
           logoSrc={logoSrc}
           companySettings={companySettings}
           onGenerateInvoice={handleGenerateInvoice}
