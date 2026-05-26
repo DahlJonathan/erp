@@ -557,7 +557,7 @@ function App() {
           </div>
         </header>
 
-        {renderActiveView(userId)}
+        {renderActiveView()}
       </div>
     </main>
   )
