@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import type { Project, Task, TimeEntry } from '../types/types'
 import { getCurrentMonthKey, getTodayIsoDate } from '../utils/date'
@@ -9,7 +9,10 @@ type DashboardProps = {
     tasks: Task[]
 }
 
+const TASKS_PAGE_SIZE = 10
+
 export function Dashboard({ projects, timeEntries, tasks }: DashboardProps) {
+    const [tasksPage, setTasksPage] = useState(1)
     const currentMonth = getCurrentMonthKey()
     const projectById = useMemo(
         () => new Map(projects.map((project) => [project.id, project])),
@@ -62,6 +65,15 @@ export function Dashboard({ projects, timeEntries, tasks }: DashboardProps) {
             }),
         [tasks],
     )
+    const totalTaskPages = Math.max(1, Math.ceil(outstandingTasks.length / TASKS_PAGE_SIZE))
+    const pagedOutstandingTasks = useMemo(() => {
+        const from = (tasksPage - 1) * TASKS_PAGE_SIZE
+        return outstandingTasks.slice(from, from + TASKS_PAGE_SIZE)
+    }, [outstandingTasks, tasksPage])
+
+    useEffect(() => {
+        setTasksPage(1)
+    }, [outstandingTasks.length])
 
     return (
         <section className="rounded-[2rem] border-2 border-slate-400 bg-white/95 p-6 shadow-sm shadow-slate-300/60">
@@ -264,7 +276,7 @@ export function Dashboard({ projects, timeEntries, tasks }: DashboardProps) {
                     <p className="mt-6 text-sm text-slate-500">Ei avoimia tehtäviä. Hienoa!</p>
                 ) : (
                     <div className="mt-6 space-y-3">
-                        {outstandingTasks.map((task) => {
+                        {pagedOutstandingTasks.map((task) => {
                             const projectName = projectById.get(task.projectId)?.name ?? ''
                             const isOverdue = task.dueDate !== null && task.dueDate < today
                             return (
@@ -301,6 +313,32 @@ export function Dashboard({ projects, timeEntries, tasks }: DashboardProps) {
                                 </div>
                             )
                         })}
+
+                        {totalTaskPages > 1 ? (
+                            <div className="flex items-center justify-between border-t-2 border-slate-300 pt-3">
+                                <p className="text-sm text-slate-600">
+                                    Sivu {tasksPage}/{totalTaskPages}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={tasksPage === 1}
+                                        onClick={() => setTasksPage((currentPage) => Math.max(1, currentPage - 1))}
+                                        className="rounded-xl border-2 border-slate-400 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                                    >
+                                        Edellinen
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={tasksPage === totalTaskPages}
+                                        onClick={() => setTasksPage((currentPage) => Math.min(totalTaskPages, currentPage + 1))}
+                                        className="rounded-xl border-2 border-slate-400 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                                    >
+                                        Seuraava
+                                    </button>
+                                </div>
+                            </div>
+                        ) : null}
                     </div>
                 )}
             </article>
