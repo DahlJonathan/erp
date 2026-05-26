@@ -557,7 +557,16 @@ function App() {
           </div>
         </header>
 
-        {renderActiveView()}
+        {isDataLoading ? (
+          <div className="flex items-center justify-center rounded-3xl border-2 border-slate-400 bg-white/95 p-16 shadow-sm shadow-slate-300/60">
+            <div className="flex flex-col items-center gap-4">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-500" />
+              <p className="text-sm font-medium text-slate-500">Ladataan tietoja...</p>
+            </div>
+          </div>
+        ) : (
+          renderActiveView()
+        )}
       </div>
     </main>
   )

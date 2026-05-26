@@ -4,7 +4,7 @@ import { addDaysToIsoDate, formatFinnishDate } from '../utils/date'
 
 import type { Client, CompanySettings, Invoice } from '../types/types'
 
-export type InvoicePrintLine = {
+type InvoicePrintLine = {
     entryId: string
     projectName: string
     description: string
@@ -34,7 +34,6 @@ const pageStyle = {
 }
 
 export function InvoicePrintView({ invoice, client, lines, logoSrc, companySettings, onReady }: InvoicePrintViewProps) {
-    const companyInfo = companySettings
     const logoRef = useRef<HTMLImageElement | null>(null)
     const hasNotifiedRef = useRef(false)
 
@@ -102,12 +101,12 @@ export function InvoicePrintView({ invoice, client, lines, logoSrc, companySetti
                         />
                     ) : null}
                     <div style={{ fontSize: '13px', lineHeight: 1.55 }}>
-                        <div style={{ fontWeight: 700, fontSize: '18px' }}>{companyInfo.name}</div>
-                        <div>Y-tunnus: {companyInfo.businessId}</div>
-                        <div>{companyInfo.street}</div>
-                        <div>{companyInfo.city}</div>
-                        <div>{companyInfo.email}</div>
-                        <div>{companyInfo.phone}</div>
+                        <div style={{ fontWeight: 700, fontSize: '18px' }}>{companySettings.name}</div>
+                        <div>Y-tunnus: {companySettings.businessId}</div>
+                        <div>{companySettings.street}</div>
+                        <div>{companySettings.city}</div>
+                        <div>{companySettings.email}</div>
+                        <div>{companySettings.phone}</div>
                     </div>
                 </div>
 
@@ -148,11 +147,11 @@ export function InvoicePrintView({ invoice, client, lines, logoSrc, companySetti
                 <div style={{ border: '1px solid #000000', padding: '12px 14px' }}>
                     <div style={{ fontSize: '12px', fontWeight: 800, marginBottom: '8px' }}>Laskuttaja</div>
                     <div style={{ fontSize: '13px', lineHeight: 1.6 }}>
-                        <div style={{ fontWeight: 700 }}>{companyInfo.name}</div>
-                        <div>{companyInfo.street}</div>
-                        <div>{companyInfo.city}</div>
-                        <div>{companyInfo.email}</div>
-                        <div>Y-tunnus: {companyInfo.businessId}</div>
+                        <div style={{ fontWeight: 700 }}>{companySettings.name}</div>
+                        <div>{companySettings.street}</div>
+                        <div>{companySettings.city}</div>
+                        <div>{companySettings.email}</div>
+                        <div>Y-tunnus: {companySettings.businessId}</div>
                     </div>
                 </div>
 
@@ -180,7 +179,7 @@ export function InvoicePrintView({ invoice, client, lines, logoSrc, companySetti
                 >
                     <div style={{ border: '1px solid #000000', padding: '10px 12px', fontSize: '13px' }}>
                         <div style={{ fontWeight: 700 }}>Maksuehto</div>
-                        <div style={{ marginTop: '6px' }}>{companyInfo.paymentTerms}</div>
+                        <div style={{ marginTop: '6px' }}>{companySettings.paymentTerms}</div>
                     </div>
                     <div style={{ border: '1px solid #000000', padding: '10px 12px', fontSize: '13px' }}>
                         <div style={{ fontWeight: 700 }}>Viitenumero</div>
@@ -188,7 +187,7 @@ export function InvoicePrintView({ invoice, client, lines, logoSrc, companySetti
                     </div>
                     <div style={{ border: '1px solid #000000', padding: '10px 12px', fontSize: '13px' }}>
                         <div style={{ fontWeight: 700 }}>Tilille</div>
-                        <div style={{ marginTop: '6px' }}>{companyInfo.iban}</div>
+                        <div style={{ marginTop: '6px' }}>{companySettings.iban}</div>
                     </div>
                 </div>
 
@@ -243,9 +242,9 @@ export function InvoicePrintView({ invoice, client, lines, logoSrc, companySetti
             >
                 <div style={{ fontSize: '13px', lineHeight: 1.7 }}>
                     <div style={{ fontWeight: 800, marginBottom: '8px' }}>Maksutiedot</div>
-                    <div><span style={{ fontWeight: 700 }}>Tilille:</span> {companyInfo.iban}</div>
-                    <div><span style={{ fontWeight: 700 }}>BIC:</span> {companyInfo.bic}</div>
-                    <div><span style={{ fontWeight: 700 }}>Maksuehto:</span> {companyInfo.paymentTerms}</div>
+                    <div><span style={{ fontWeight: 700 }}>Tilille:</span> {companySettings.iban}</div>
+                    <div><span style={{ fontWeight: 700 }}>BIC:</span> {companySettings.bic}</div>
+                    <div><span style={{ fontWeight: 700 }}>Maksuehto:</span> {companySettings.paymentTerms}</div>
                     <div><span style={{ fontWeight: 700 }}>Viitenumero:</span> {invoice.invoiceNumber}</div>
                 </div>
 

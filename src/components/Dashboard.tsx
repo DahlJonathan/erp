@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 
 import type { Project, Task, TimeEntry } from '../types/types'
-import { getCurrentMonthKey } from '../utils/date'
+import { getCurrentMonthKey, getTodayIsoDate } from '../utils/date'
 
 type DashboardProps = {
     projects: Project[]
@@ -50,7 +50,7 @@ export function Dashboard({ projects, timeEntries, tasks }: DashboardProps) {
         }
     })
 
-    const today = new Date().toISOString().slice(0, 10)
+    const today = getTodayIsoDate()
     const outstandingTasks = useMemo(
         () => tasks
             .filter((t) => t.status === 'todo' || t.status === 'in_progress')

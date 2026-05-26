@@ -2,23 +2,15 @@ import { useEffect, useRef } from 'react'
 
 import { formatFinnishDate } from '../utils/date'
 
-import type { Client, Project, TimeEntry } from '../types/types'
+import type { Client, CompanySettings, Project, TimeEntry } from '../types/types'
 
 type ProjectPrintViewProps = {
     project: Project
     client: Client
     timeEntries: TimeEntry[]
     logoSrc: string
+    companySettings: CompanySettings
     onReady?: () => void
-}
-
-const companyInfo = {
-    name: 'Iisiduuni Oy',
-    businessId: '3135307-9',
-    email: 'info@iisiduuni.fi',
-    phone: '+358 40 000 0000',
-    street: 'Kalliokielontie 18 A 4',
-    city: '94400 Keminmaa',
 }
 
 const pageStyle = {
@@ -40,7 +32,7 @@ const projectStatusLabels: Record<string, string> = {
     archived: 'Arkistoitu',
 }
 
-export function ProjectPrintView({ project, client, timeEntries, logoSrc, onReady }: ProjectPrintViewProps) {
+export function ProjectPrintView({ project, client, timeEntries, logoSrc, companySettings, onReady }: ProjectPrintViewProps) {
     const logoRef = useRef<HTMLImageElement | null>(null)
     const hasNotifiedRef = useRef(false)
 
@@ -95,16 +87,16 @@ export function ProjectPrintView({ project, client, timeEntries, logoSrc, onRead
                     <img
                         ref={logoRef}
                         src={logoSrc}
-                        alt="Iisiduuni"
+                        alt={companySettings.name}
                         style={{ width: '150px', height: 'auto', objectFit: 'contain' }}
                     />
                     <div style={{ fontSize: '13px', lineHeight: 1.55 }}>
-                        <div style={{ fontWeight: 700, fontSize: '18px' }}>{companyInfo.name}</div>
-                        <div>Y-tunnus: {companyInfo.businessId}</div>
-                        <div>{companyInfo.street}</div>
-                        <div>{companyInfo.city}</div>
-                        <div>{companyInfo.email}</div>
-                        <div>{companyInfo.phone}</div>
+                        <div style={{ fontWeight: 700, fontSize: '18px' }}>{companySettings.name}</div>
+                        <div>Y-tunnus: {companySettings.businessId}</div>
+                        <div>{companySettings.street}</div>
+                        <div>{companySettings.city}</div>
+                        <div>{companySettings.email}</div>
+                        <div>{companySettings.phone}</div>
                     </div>
                 </div>
 
