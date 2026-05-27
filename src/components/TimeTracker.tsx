@@ -29,11 +29,22 @@ function ProjectSelect({
     disabled?: boolean
 }) {
     const [open, setOpen] = useState(false)
+    const [searchTerm, setSearchTerm] = useState('')
     const ref = useRef<HTMLDivElement>(null)
     const selected = options.find((o) => o.value === value)
+    const filteredOptions = useMemo(() => {
+        const normalizedSearch = searchTerm.trim().toLowerCase()
+        if (!normalizedSearch) {
+            return options
+        }
+        return options.filter((option) => option.label.toLowerCase().includes(normalizedSearch))
+    }, [options, searchTerm])
 
     useEffect(() => {
-        if (disabled) setOpen(false)
+        if (disabled) {
+            setOpen(false)
+            setSearchTerm('')
+        }
     }, [disabled])
 
     useEffect(() => {
@@ -49,7 +60,13 @@ function ProjectSelect({
             <button
                 type="button"
                 disabled={disabled}
-                onClick={() => setOpen((o) => !o)}
+                onClick={() => setOpen((isOpen) => {
+                    const nextOpen = !isOpen
+                    if (!nextOpen) {
+                        setSearchTerm('')
+                    }
+                    return nextOpen
+                })}
                 className={`flex w-full items-center justify-between rounded-2xl border-2 px-4 py-3 text-left text-sm outline-none transition ${
                     disabled
                         ? 'cursor-not-allowed border-slate-700 bg-slate-800 text-slate-500'
@@ -64,19 +81,40 @@ function ProjectSelect({
                 </svg>
             </button>
             {open && (
-                <ul className="absolute z-50 mt-1 w-full overflow-hidden rounded-2xl border-2 border-slate-600 bg-slate-800 shadow-lg shadow-black/40">
-                    {options.map((opt) => (
-                        <li
-                            key={opt.value}
-                            onClick={() => { onChange(opt.value); setOpen(false) }}
-                            className={`cursor-pointer px-4 py-2.5 text-sm transition hover:bg-slate-700 ${
-                                opt.value === value ? 'font-semibold text-emerald-300' : 'text-slate-100'
-                            }`}
-                        >
-                            {opt.label}
-                        </li>
-                    ))}
-                </ul>
+                <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-2xl border-2 border-slate-600 bg-slate-800 shadow-lg shadow-black/40">
+                    <div className="border-b border-slate-600 p-2">
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(event) => setSearchTerm(event.target.value)}
+                            placeholder="Hae projektia..."
+                            className="w-full rounded-xl border border-slate-500 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-400 focus:border-emerald-300"
+                        />
+                    </div>
+                    <ul className="max-h-60 overflow-y-auto py-1">
+                        {filteredOptions.length === 0 ? (
+                            <li className="px-4 py-2.5 text-sm text-slate-400">
+                                Ei hakutuloksia.
+                            </li>
+                        ) : (
+                            filteredOptions.map((opt) => (
+                                <li
+                                    key={opt.value}
+                                    onClick={() => {
+                                        onChange(opt.value)
+                                        setSearchTerm('')
+                                        setOpen(false)
+                                    }}
+                                    className={`cursor-pointer px-4 py-2.5 text-sm transition hover:bg-slate-700 ${
+                                        opt.value === value ? 'font-semibold text-emerald-300' : 'text-slate-100'
+                                    }`}
+                                >
+                                    {opt.label}
+                                </li>
+                            ))
+                        )}
+                    </ul>
+                </div>
             )}
         </div>
     )

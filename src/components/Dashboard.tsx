@@ -10,9 +10,11 @@ type DashboardProps = {
 }
 
 const TASKS_PAGE_SIZE = 10
+const BURN_DOWN_PAGE_SIZE = 10
 
 export function Dashboard({ projects, timeEntries, tasks }: DashboardProps) {
     const [tasksPage, setTasksPage] = useState(1)
+    const [burnDownPage, setBurnDownPage] = useState(1)
     const currentMonth = getCurrentMonthKey()
     const projectById = useMemo(
         () => new Map(projects.map((project) => [project.id, project])),
@@ -52,6 +54,11 @@ export function Dashboard({ projects, timeEntries, tasks }: DashboardProps) {
             overBudget: usedHours > project.budgetHours,
         }
     })
+    const totalBurnDownPages = Math.max(1, Math.ceil(burnDownProjects.length / BURN_DOWN_PAGE_SIZE))
+    const pagedBurnDownProjects = useMemo(() => {
+        const from = (burnDownPage - 1) * BURN_DOWN_PAGE_SIZE
+        return burnDownProjects.slice(from, from + BURN_DOWN_PAGE_SIZE)
+    }, [burnDownProjects, burnDownPage])
 
     const today = getTodayIsoDate()
     const outstandingTasks = useMemo(
@@ -74,6 +81,10 @@ export function Dashboard({ projects, timeEntries, tasks }: DashboardProps) {
     useEffect(() => {
         setTasksPage(1)
     }, [outstandingTasks.length])
+
+    useEffect(() => {
+        setBurnDownPage(1)
+    }, [burnDownProjects.length])
 
     return (
         <section className="rounded-[2rem] border-2 border-slate-400 bg-white/95 p-6 shadow-sm shadow-slate-300/60">
@@ -233,7 +244,7 @@ export function Dashboard({ projects, timeEntries, tasks }: DashboardProps) {
                 </h3>
 
                 <div className="mt-6 space-y-4">
-                    {burnDownProjects.map((project) => (
+                    {pagedBurnDownProjects.map((project) => (
                         <div key={project.id} className="rounded-2xl border-2 border-slate-300 bg-white p-4">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                                 <div>
@@ -261,6 +272,32 @@ export function Dashboard({ projects, timeEntries, tasks }: DashboardProps) {
                             </div>
                         </div>
                     ))}
+
+                    {totalBurnDownPages > 1 ? (
+                        <div className="flex items-center justify-between border-t-2 border-slate-300 pt-3">
+                            <p className="text-sm text-slate-600">
+                                Sivu {burnDownPage}/{totalBurnDownPages}
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    disabled={burnDownPage === 1}
+                                    onClick={() => setBurnDownPage((currentPage) => Math.max(1, currentPage - 1))}
+                                    className="rounded-xl border-2 border-slate-400 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                                >
+                                    Edellinen
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={burnDownPage === totalBurnDownPages}
+                                    onClick={() => setBurnDownPage((currentPage) => Math.min(totalBurnDownPages, currentPage + 1))}
+                                    className="rounded-xl border-2 border-slate-400 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                                >
+                                    Seuraava
+                                </button>
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
             </article>
 
