@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Pencil, Trash2, X, Check } from 'lucide-react'
 
 import type { Client, NewClient } from '../types/types'
@@ -9,6 +9,8 @@ type ClientsViewProps = {
     onUpdateClient: (clientId: string, data: NewClient) => Promise<void>
     onDeleteClient: (clientId: string) => Promise<void>
 }
+
+const CLIENTS_PAGE_SIZE = 10
 
 type ClientFormState = {
     name: string
@@ -59,6 +61,17 @@ export function ClientsView({ clients, onCreateClient, onUpdateClient, onDeleteC
     const [confirmDeleteClient, setConfirmDeleteClient] = useState<Client | null>(null)
     const [deletingClientId, setDeletingClientId] = useState<string | null>(null)
     const [deleteError, setDeleteError] = useState<string | null>(null)
+    const [clientsPage, setClientsPage] = useState(1)
+
+    const totalClientPages = Math.max(1, Math.ceil(clients.length / CLIENTS_PAGE_SIZE))
+    const pagedClients = useMemo(() => {
+        const from = (clientsPage - 1) * CLIENTS_PAGE_SIZE
+        return clients.slice(from, from + CLIENTS_PAGE_SIZE)
+    }, [clients, clientsPage])
+
+    useEffect(() => {
+        setClientsPage((currentPage) => Math.min(currentPage, totalClientPages))
+    }, [totalClientPages])
 
     function handleAddFieldChange(field: keyof ClientFormState, value: string) {
         setAddForm((s) => ({ ...s, [field]: value }))
@@ -223,7 +236,7 @@ export function ClientsView({ clients, onCreateClient, onUpdateClient, onDeleteC
                         </div>
                     )}
 
-                    {clients.map((client) => {
+                    {pagedClients.map((client) => {
                         const isEditing = editClientId === client.id
                         const isDeleting = deletingClientId === client.id
 
@@ -307,6 +320,32 @@ export function ClientsView({ clients, onCreateClient, onUpdateClient, onDeleteC
                         )
                     })}
                 </div>
+
+                {totalClientPages > 1 && (
+                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-slate-300 bg-slate-50 px-4 py-3">
+                        <p className="text-sm font-medium text-slate-700">
+                            Sivu {clientsPage}/{totalClientPages} &middot; {clients.length} asiakasta
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setClientsPage((currentPage) => Math.max(1, currentPage - 1))}
+                                disabled={clientsPage === 1}
+                                className="rounded-xl border-2 border-slate-400 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Edellinen
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setClientsPage((currentPage) => Math.min(totalClientPages, currentPage + 1))}
+                                disabled={clientsPage === totalClientPages}
+                                className="rounded-xl border-2 border-slate-400 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Seuraava
+                            </button>
+                        </div>
+                    </div>
+                )}
             </section>
 
             {/* Delete confirm modal */}
