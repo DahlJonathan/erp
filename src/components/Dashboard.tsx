@@ -15,6 +15,8 @@ const BURN_DOWN_PAGE_SIZE = 10
 export function Dashboard({ projects, timeEntries, tasks }: DashboardProps) {
     const [tasksPage, setTasksPage] = useState(1)
     const [burnDownPage, setBurnDownPage] = useState(1)
+    const [burnDownOpen, setBurnDownOpen] = useState(false)
+    const [tasksOpen, setTasksOpen] = useState(false)
     const currentMonth = getCurrentMonthKey()
     const projectById = useMemo(
         () => new Map(projects.map((project) => [project.id, project])),
@@ -236,14 +238,25 @@ export function Dashboard({ projects, timeEntries, tasks }: DashboardProps) {
             </div>
 
             <article className="mt-6 rounded-3xl border-2 border-slate-400 bg-slate-50 p-5">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                    Projektien kulutus
-                </p>
-                <h3 className="mt-2 text-xl font-semibold text-slate-950">
-                    Käytetyt tunnit vs. budjetti
-                </h3>
+                <button
+                    type="button"
+                    onClick={() => setBurnDownOpen((o) => !o)}
+                    className="flex w-full items-center justify-between gap-3 text-left"
+                >
+                    <div>
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                            Projektien kulutus
+                        </p>
+                        <h3 className="mt-2 text-xl font-semibold text-slate-950">
+                            Käytetyt tunnit vs. budjetti
+                        </h3>
+                    </div>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-slate-300 bg-white text-slate-500 transition hover:bg-slate-100">
+                        {burnDownOpen ? '▲' : '▼'}
+                    </span>
+                </button>
 
-                <div className="mt-6 space-y-4">
+                {burnDownOpen && <div className="mt-6 space-y-4">
                     {pagedBurnDownProjects.map((project) => (
                         <div key={project.id} className="rounded-2xl border-2 border-slate-300 bg-white p-4">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -298,18 +311,29 @@ export function Dashboard({ projects, timeEntries, tasks }: DashboardProps) {
                             </div>
                         </div>
                     ) : null}
-                </div>
+                </div>}
             </article>
 
             <article className="mt-6 rounded-3xl border-2 border-slate-400 bg-slate-50 p-5">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                    Tehtävät
-                </p>
-                <h3 className="mt-2 text-xl font-semibold text-slate-950">
-                    Avoimet tehtävät
-                </h3>
+                <button
+                    type="button"
+                    onClick={() => setTasksOpen((o) => !o)}
+                    className="flex w-full items-center justify-between gap-3 text-left"
+                >
+                    <div>
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                            Tehtävät
+                        </p>
+                        <h3 className="mt-2 text-xl font-semibold text-slate-950">
+                            Avoimet tehtävät
+                        </h3>
+                    </div>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-slate-300 bg-white text-slate-500 transition hover:bg-slate-100">
+                        {tasksOpen ? '▲' : '▼'}
+                    </span>
+                </button>
 
-                {outstandingTasks.length === 0 ? (
+                {tasksOpen && (outstandingTasks.length === 0 ? (
                     <p className="mt-6 text-sm text-slate-500">Ei avoimia tehtäviä. Hienoa!</p>
                 ) : (
                     <div className="mt-6 space-y-3">
@@ -377,7 +401,7 @@ export function Dashboard({ projects, timeEntries, tasks }: DashboardProps) {
                             </div>
                         ) : null}
                     </div>
-                )}
+                ))}
             </article>
         </section>
     )

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { InvoicePrintView } from './InvoicePrintView'
@@ -104,6 +104,11 @@ const invoiceStatusLabels = {
 
 export function Historia({ clients, invoices, projects, timeEntries, logoSrc, companySettings }: HistoriaProps) {
     const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
+    const [aiSummary, setAiSummary] = useState<string | null>(null)
+    const [aiLoading, setAiLoading] = useState(false)
+    const [aiError, setAiError] = useState<string | null>(null)
+    const [aiUserMessage, setAiUserMessage] = useState('')
+    const summaryRef = useRef<HTMLDivElement>(null)
 
     const clientById = useMemo(
         () => new Map(clients.map((client) => [client.id, client])),
@@ -142,6 +147,71 @@ export function Historia({ clients, invoices, projects, timeEntries, logoSrc, co
         })),
         [clientById, invoices],
     )
+
+    async function handleGenerateSummary() {
+        const apiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined
+        if (!apiKey) {
+            setAiError('OpenAI API-avain puuttuu. Tarkista .env-tiedosto.')
+            return
+        }
+
+        setAiLoading(true)
+        setAiError(null)
+        setAiSummary(null)
+
+        const invoiceSummaries = invoices.map((inv) => {
+            const client = clientById.get(inv.clientId)
+            const entries = timeEntries.filter((e) => e.invoiceId === inv.id)
+            const totalHours = entries.reduce((s, e) => s + e.duration, 0)
+            return `Lasku ${inv.invoiceNumber} (${inv.date}): asiakas "${client?.name ?? 'tuntematon'}", summa ${inv.totalAmount.toFixed(2)} EUR, tila: ${inv.status}, tunnit: ${totalHours.toFixed(1)} h`
+        }).join('\n')
+
+        const projectSummaries = projects.map((p) => {
+            const entries = timeEntries.filter((e) => e.projectId === p.id)
+            const totalHours = entries.reduce((s, e) => s + e.duration, 0)
+            const billable = entries.filter((e) => e.isBillable).reduce((s, e) => s + e.duration, 0)
+            return `Projekti "${p.name}" (tila: ${p.status}): ${totalHours.toFixed(1)} h yhteensä, ${billable.toFixed(1)} h laskutettavaa, budjetti ${p.budgetHours.toFixed(1)} h, tuntihinta ${p.hourlyRate} EUR/h`
+        }).join('\n')
+
+        const systemPrompt = `Olet liiketoiminta-analyytikko. Analysoit suomalaisen yrityksen ERP-järjestelmän laskuja ja tuntitietoja ja teet niistä selkeän, käytännöllisen yhteenvedon suomeksi. Vastaa aina suomeksi. Pidä vastaus tiiviinä mutta informatiivisena.`
+
+        const userContent = aiUserMessage.trim()
+            ? `Tässä tiedot:\n\nLASKUT:\n${invoiceSummaries}\n\nPROJEKTIT:\n${projectSummaries}\n\nKäyttäjän kysymys: ${aiUserMessage}`
+            : `Tässä tiedot:\n\nLASKUT:\n${invoiceSummaries}\n\nPROJEKTIT:\n${projectSummaries}\n\nLuo näiden perusteella kattava yhteenveto: mitä on tehty, mihin aikaa on käytetty, mikä on laskutettu, onko budjetteja ylitetty ja mitä huomioita nousee esiin.`
+
+        try {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userContent },
+                    ],
+                    max_tokens: 1200,
+                    temperature: 0.4,
+                }),
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error((errorData as { error?: { message?: string } }).error?.message ?? `HTTP ${response.status}`)
+            }
+
+            const data = await response.json() as { choices: { message: { content: string } }[] }
+            const content = data.choices[0]?.message?.content ?? ''
+            setAiSummary(content)
+            setTimeout(() => summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+        } catch (err) {
+            setAiError(err instanceof Error ? err.message : 'Tuntematon virhe')
+        } finally {
+            setAiLoading(false)
+        }
+    }
 
     function handlePreviewProject(project: Project) {
         const previewClient = clientById.get(project.clientId)
@@ -271,6 +341,62 @@ export function Historia({ clients, invoices, projects, timeEntries, logoSrc, co
                     Näe päättyneet projektit, toteutuneet tunnit ja aiemmin tallennetut laskut yhdestä näkymästä.
                 </p>
             </div>
+
+            {/* AI Assistant */}
+            <article className="mt-6 rounded-3xl border-2 border-slate-400 bg-slate-50 p-5">
+                <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-white text-lg">
+                        ✦
+                    </div>
+                    <div>
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">AI-assistentti</p>
+                        <h3 className="mt-1 text-xl font-semibold text-slate-950">Yhteenveto laskuista ja ajankäytöstä</h3>
+                        <p className="mt-1 text-sm text-slate-600">Kysy tai pyydä yhteenveto – tekoäly analysoi laskut ja tuntikirjaukset.</p>
+                    </div>
+                </div>
+
+                <div className="mt-4 flex gap-2">
+                    <input
+                        type="text"
+                        value={aiUserMessage}
+                        onChange={(e) => setAiUserMessage(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && !aiLoading) void handleGenerateSummary() }}
+                        placeholder="Esim. Mikä projekti on käyttänyt eniten tunteja? (tai jätä tyhjäksi yleistä yhteenvetoa varten)"
+                        className="flex-1 rounded-xl border-2 border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-500 focus:outline-none"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => void handleGenerateSummary()}
+                        disabled={aiLoading}
+                        className="shrink-0 rounded-xl border-2 border-slate-400 bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60"
+                    >
+                        {aiLoading ? 'Analysoidaan...' : 'Analysoi'}
+                    </button>
+                </div>
+
+                {aiError && (
+                    <div className="mt-4 rounded-xl border-2 border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                        <strong>Virhe:</strong> {aiError}
+                    </div>
+                )}
+
+                {aiLoading && (
+                    <div className="mt-4 flex items-center gap-3 text-sm text-slate-500">
+                        <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                        </svg>
+                        Analysoi tietoja...
+                    </div>
+                )}
+
+                {aiSummary && (
+                    <div ref={summaryRef} className="mt-4 rounded-2xl border-2 border-slate-300 bg-white p-5">
+                        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">AI-yhteenveto</p>
+                        <div className="whitespace-pre-wrap text-sm leading-7 text-slate-800">{aiSummary}</div>
+                    </div>
+                )}
+            </article>
 
             <div className="mt-8 space-y-8">
                 <article className="rounded-3xl border-2 border-slate-400 bg-slate-50 p-5">
