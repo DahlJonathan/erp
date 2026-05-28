@@ -423,6 +423,56 @@ export function InvoicingView({
         )
     }
 
+    function handleOpenInvoice(invoice: Invoice) {
+        const client = clientById.get(invoice.clientId)
+        if (!client) return
+
+        const lines = timeEntries
+            .filter((e) => e.invoiceId === invoice.id)
+            .map((e) => {
+                const project = projectById.get(e.projectId)
+                return project
+                    ? {
+                        entryId: e.id,
+                        projectName: project.name,
+                        description: e.description,
+                        duration: e.duration,
+                        hourlyRate: project.hourlyRate,
+                        lineTotal: e.duration * project.hourlyRate,
+                    }
+                    : null
+            })
+            .filter((l): l is NonNullable<typeof l> => l !== null)
+
+        const printWindow = window.open('', '_blank', 'popup=yes,width=1080,height=900')
+        if (!printWindow) return
+
+        const doc = printWindow.document
+        doc.documentElement.lang = 'fi'
+        doc.title = `Lasku ${invoice.invoiceNumber}`
+        doc.head.innerHTML = `<meta charset="utf-8" /><title>Lasku ${invoice.invoiceNumber}</title><style>${printWindowStyles}</style>`
+        doc.body.innerHTML = `
+            <div id="print-toolbar">
+                <span>Lasku ${invoice.invoiceNumber}</span>
+                <button onclick="window.print()">&#8595; Lataa PDF</button>
+            </div>
+            <div id="print-content"><div id="invoice-print-root"></div></div>
+        `
+
+        const rootEl = doc.getElementById('invoice-print-root')
+        if (!rootEl) { printWindow.close(); return }
+
+        createRoot(rootEl).render(
+            <InvoicePrintView
+                invoice={invoice}
+                client={client}
+                lines={lines}
+                logoSrc={logoSrc}
+                companySettings={companySettings}
+            />,
+        )
+    }
+
     const persistedPreview = useMemo(() => {
         if (!invoicePreview) {
             return null
@@ -658,6 +708,13 @@ export function InvoicingView({
                                         )}
                                     </div>
                                     <div className="flex flex-wrap gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleOpenInvoice(invoice)}
+                                            className="rounded-xl border-2 border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                                        >
+                                            Avaa lasku
+                                        </button>
                                         <button
                                             type="button"
                                             disabled={isBusy || sendingEmailId === invoice.id}
