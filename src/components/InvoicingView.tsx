@@ -165,13 +165,6 @@ export function InvoicingView({
             return
         }
 
-        const apiKey = import.meta.env.VITE_BREVO_API_KEY as string | undefined
-        if (!apiKey) {
-            setEmailResult({ invoiceId: invoice.id, ok: false, msg: 'Brevo API-avain puuttuu.' })
-            return
-        }
-
-        const senderEmail = (import.meta.env.VITE_BREVO_SENDER_EMAIL as string | undefined) ?? 'info@iisiduuni.fi'
         const senderName = (import.meta.env.VITE_BREVO_SENDER_NAME as string | undefined) ?? 'Iisiduuni'
 
         const lines = timeEntries
@@ -249,27 +242,22 @@ export function InvoicingView({
 </body>
 </html>`
 
-            const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            const response = await fetch('/.netlify/functions/send-invoice-email', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'api-key': apiKey,
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    sender: { name: senderName, email: senderEmail },
-                    to: [{ email: recipientEmail, name: client.name }],
+                    recipientEmail,
+                    recipientName: client.name,
                     subject: `Lasku ${invoice.invoiceNumber} – ${senderName}`,
                     htmlContent: htmlBody,
-                    attachment: [{
-                        name: `lasku-${invoice.invoiceNumber}.pdf`,
-                        content: base64Pdf,
-                    }],
+                    attachmentName: `lasku-${invoice.invoiceNumber}.pdf`,
+                    attachmentContent: base64Pdf,
                 }),
             })
 
             if (!response.ok) {
                 const err = await response.json().catch(() => ({}))
-                throw new Error((err as { message?: string }).message ?? `HTTP ${response.status}`)
+                throw new Error((err as { error?: string }).error ?? `HTTP ${response.status}`)
             }
 
             if (invoice.status === 'draft') {

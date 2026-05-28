@@ -151,12 +151,6 @@ export function Historia({ clients, invoices, projects, timeEntries, logoSrc, co
     )
 
     async function handleGenerateSummary() {
-        const apiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined
-        if (!apiKey) {
-            setAiError('OpenAI API-avain puuttuu. Tarkista .env-tiedosto.')
-            return
-        }
-
         setAiLoading(true)
         setAiError(null)
         setAiSummary(null)
@@ -182,26 +176,15 @@ export function Historia({ clients, invoices, projects, timeEntries, logoSrc, co
             : `Tässä tiedot:\n\nLASKUT:\n${invoiceSummaries}\n\nPROJEKTIT:\n${projectSummaries}\n\nLuo näiden perusteella kattava yhteenveto: mitä on tehty, mihin aikaa on käytetty, mikä on laskutettu, onko budjetteja ylitetty ja mitä huomioita nousee esiin.`
 
         try {
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            const response = await fetch('/.netlify/functions/ai-analyze', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${apiKey}`,
-                },
-                body: JSON.stringify({
-                    model: 'gpt-4o',
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userContent },
-                    ],
-                    max_tokens: 1200,
-                    temperature: 0.4,
-                }),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ systemPrompt, userContent }),
             })
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}))
-                throw new Error((errorData as { error?: { message?: string } }).error?.message ?? `HTTP ${response.status}`)
+                throw new Error((errorData as { error?: string }).error ?? `HTTP ${response.status}`)
             }
 
             const data = await response.json() as { choices: { message: { content: string } }[] }
