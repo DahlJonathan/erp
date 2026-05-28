@@ -140,11 +140,13 @@ export function Historia({ clients, invoices, projects, timeEntries, logoSrc, co
     )
 
     const invoiceHistory = useMemo(
-        () => invoices.map((invoice) => ({
-            invoice,
-            client: clientById.get(invoice.clientId),
-            totalWithVat: invoice.totalAmount * 1.255,
-        })),
+        () => invoices
+            .filter((invoice) => invoice.status === 'paid')
+            .map((invoice) => ({
+                invoice,
+                client: clientById.get(invoice.clientId),
+                totalWithVat: invoice.totalAmount * 1.255,
+            })),
         [clientById, invoices],
     )
 

@@ -32,6 +32,7 @@ import type {
   CompanySettings,
   Invoice,
   InvoiceRow,
+  InvoiceStatus,
   NewClient,
   NewProject,
   NewTimeEntry,
@@ -88,15 +89,21 @@ function App() {
       setSession(data.session)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+      // Only update session on actual sign-in/sign-out, not on token refresh
+      // This prevents re-fetching all data when returning to the tab
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+        setSession(newSession)
+      }
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
+  const sessionUserId = session?.user?.id ?? null
+
   useEffect(() => {
-    if (!session) return
+    if (!sessionUserId) return
     let isActive = true
 
     async function loadData() {
@@ -152,7 +159,7 @@ function App() {
     return () => {
       isActive = false
     }
-  }, [session])
+  }, [sessionUserId])
 
 
   const draftCount = timeEntries.filter((entry) => entry.status === 'draft').length
@@ -369,6 +376,24 @@ function App() {
     return invoice
   }
 
+  async function handleUpdateInvoiceStatus(invoiceId: string, status: InvoiceStatus) {
+    const { data, error } = await supabase
+      .from('invoices')
+      .update({ status })
+      .eq('id', invoiceId)
+      .select('*')
+      .single()
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    const updatedInvoice = mapInvoiceRow(data as InvoiceRow)
+    setInvoices((current) =>
+      current.map((inv) => (inv.id === invoiceId ? updatedInvoice : inv)),
+    )
+  }
+
   function renderActiveView() {
     if (activeView === 'settings') {
       return (
@@ -454,6 +479,7 @@ function App() {
           logoSrc={logoSrc}
           companySettings={companySettings}
           onGenerateInvoice={handleGenerateInvoice}
+          onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
         />
       </div>
     )
