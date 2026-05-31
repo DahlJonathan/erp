@@ -83,6 +83,7 @@ function App() {
   const [isDataLoading, setIsDataLoading] = useState(true)
   const [dataError, setDataError] = useState<string | null>(null)
   const [projectListRefreshTrigger, setProjectListRefreshTrigger] = useState(0)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
@@ -170,6 +171,10 @@ function App() {
     { id: 'tracker', label: 'Seuranta', hint: 'Projektit ja tunnit' },
     { id: 'management', label: 'Hallinta', hint: 'Hyväksyntä ja laskutus' },
     { id: 'history', label: 'Historia', hint: 'Projektit ja laskut' },
+  ]
+
+  const sidebarItems: Array<{ id: AppView; label: string; hint: string }> = [
+    { id: 'dashboard', label: 'Laskutus ja projektinhallinta', hint: 'Takaisin päänäkymään' },
     { id: 'clients', label: 'Asiakkaat', hint: 'Asiakashallinta' },
     { id: 'settings', label: 'Asetukset', hint: 'Yritystiedot ja logo' },
   ]
@@ -495,12 +500,115 @@ function App() {
 
   const userId = session.user.id
 
+  const isSideView = activeView === 'clients' || activeView === 'settings'
+
+  const sidebarDrawer = (
+    <>
+      <button
+        type="button"
+        onClick={() => setSidebarOpen(true)}
+        className="fixed left-4 top-4 z-30 rounded-2xl border-2 border-slate-400 bg-white px-3 py-2 text-slate-900 shadow-sm transition hover:bg-slate-100"
+        aria-label="Avaa valikko"
+      >
+        ☰
+      </button>
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 flex justify-start">
+          <div
+            className="absolute inset-0 bg-slate-950/30 backdrop-blur-sm"
+            onClick={() => setSidebarOpen(false)}
+          />
+          <aside className="relative z-50 flex h-full w-64 flex-col gap-2 bg-white px-4 py-8 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Valikko</p>
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(false)}
+                className="rounded-xl border-2 border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+            {sidebarItems.map((item) => {
+              const isActive = activeView === item.id
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => { setActiveView(item.id); setSidebarOpen(false) }}
+                  className={`rounded-2xl px-4 py-3 text-left transition ${
+                    isActive
+                      ? 'border-2 border-slate-950 bg-slate-950 text-white shadow-lg shadow-slate-900/10'
+                      : 'border-2 border-slate-400 bg-white text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="block text-sm font-semibold">{item.label}</span>
+                  <span className={`block text-xs ${isActive ? 'text-slate-300' : 'text-slate-500'}`}>
+                    {item.hint}
+                  </span>
+                </button>
+              )
+            })}
+          </aside>
+        </div>
+      )}
+    </>
+  )
+
+  const sideViewTitle = activeView === 'clients' ? 'Asiakkaat' : 'Asetukset'
+  const sideViewHint = activeView === 'clients' ? 'Asiakashallinta' : 'Yritystiedot ja logo'
+
+  if (isSideView) {
+    return (
+      <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_transparent_30%),linear-gradient(180deg,_#f8fafc_0%,_#e2e8f0_100%)] px-4 py-10 text-slate-950 sm:px-6 lg:px-8">
+        {sidebarDrawer}
+        <div className="mx-auto flex max-w-7xl flex-col gap-8">
+          <header className="rounded-[2rem] border-2 border-slate-400 bg-white/90 px-6 py-8 shadow-sm shadow-slate-300/70 backdrop-blur sm:px-8">
+            <div className="flex items-start justify-between">
+              <div>
+                <h1 className="text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
+                  {sideViewTitle}
+                </h1>
+                <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
+                  {sideViewHint}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-slate-700">
+                  {session.user.user_metadata?.name ?? session.user.email}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => supabase.auth.signOut()}
+                  className="rounded-2xl border-2 border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                >
+                  Kirjaudu ulos
+                </button>
+              </div>
+            </div>
+          </header>
+          {isDataLoading ? (
+            <div className="flex items-center justify-center rounded-3xl border-2 border-slate-400 bg-white/95 p-16 shadow-sm shadow-slate-300/60">
+              <div className="flex flex-col items-center gap-4">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-500" />
+                <p className="text-sm font-medium text-slate-500">Ladataan tietoja...</p>
+              </div>
+            </div>
+          ) : (
+            renderActiveView()
+          )}
+        </div>
+      </main>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_transparent_30%),linear-gradient(180deg,_#f8fafc_0%,_#e2e8f0_100%)] px-4 py-10 text-slate-950 sm:px-6 lg:px-8">
+      {sidebarDrawer}
       <div className="mx-auto flex max-w-7xl flex-col gap-8">
         <header className="rounded-[2rem] border-2 border-slate-400 bg-white/90 px-6 py-8 shadow-sm shadow-slate-300/70 backdrop-blur sm:px-8">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-500"></span>
+            <span />
             <div className="flex items-center gap-3">
               <span className="text-sm text-slate-700">
                 {session.user.user_metadata?.name ?? session.user.email}
@@ -570,14 +678,16 @@ function App() {
               })}
             </nav>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.18em] text-amber-700">Luonnokset</p>
-                <p className="mt-1 text-xl font-semibold text-slate-950">{draftCount}</p>
-              </div>
-              <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.18em] text-emerald-700">Hyväksytyt</p>
-                <p className="mt-1 text-xl font-semibold text-slate-950">{approvedCount}</p>
+            <div className="flex items-center gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.18em] text-amber-700">Luonnokset</p>
+                  <p className="mt-1 text-xl font-semibold text-slate-950">{draftCount}</p>
+                </div>
+                <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.18em] text-emerald-700">Hyväksytyt</p>
+                  <p className="mt-1 text-xl font-semibold text-slate-950">{approvedCount}</p>
+                </div>
               </div>
             </div>
           </div>
