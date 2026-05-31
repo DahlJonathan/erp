@@ -178,7 +178,6 @@ export function ClientsView({ clients, onCreateClient, onUpdateClient, onDeleteC
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4 border-b-2 border-slate-400 pb-6">
                     <div>
-                        <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">Asiakkaat</p>
                         <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Asiakashallinta</h2>
                         <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
                             Hallitse laskutusasiakkaita, heidän yhteystietojaan ja laskutusosoitteitaan.

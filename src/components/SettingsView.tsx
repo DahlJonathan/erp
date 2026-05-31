@@ -81,7 +81,6 @@ export function SettingsView({ userId, initialSettings, initialLogoSrc, onSaved 
 
     return (
         <section className="rounded-[2rem] border-2 border-slate-400 bg-white/95 p-6 shadow-sm shadow-slate-300/60">
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">Asetukset</p>
             <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Omat tiedot</h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
                 Tallennetut tiedot lisätään automaattisesti laskuille ja muille asiakirjoille.
