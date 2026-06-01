@@ -1,115 +1,147 @@
-# ERP
+# Iisiduuni ERP
 
-Small ERP-style web app for managing clients, projects, time entries, approvals, invoicing, and historical reporting.
+Kevyt selainpohjainen ERP-sovellus asiakkuuksien, projektien, tuntikirjausten, hyväksynnän ja laskutuksen hallintaan.
 
-The frontend is built with React, TypeScript, and Vite. Data is loaded from Supabase and written back directly from the UI.
+Sovellus on rakennettu Reactilla, TypeScriptillä ja Vitellä. Data tallennetaan Supabaseen, kirjautuminen hoidetaan Supabase Authilla ja tuotantobuildi on valmiiksi sovitettu Netlifyyn.
 
-## What It Does
+## Ominaisuudet
 
-- Track clients and their billing details.
-- Create and manage projects with hourly rates, budgets, and statuses.
-- Log billable time entries.
-- Approve work entries before invoicing.
-- Generate invoice drafts from approved work.
-- Review project, invoice, and time-entry history.
+- Asiakasrekisteri yhteys- ja laskutustiedoilla.
+- Projektien luonti, muokkaus, budjetointi, tuntihinta ja määräpäivä.
+- Projektikohtaiset tehtävät ja tilat.
+- Tuntikirjaukset laskutettaville ja ei-laskutettaville töille.
+- Tuntien hyväksyntä ennen laskutusta.
+- Laskuluonnosten generointi hyväksytyistä tunneista.
+- Laskujen tilaseuranta: luonnos, lähetetty, maksettu ja erääntynyt.
+- PDF-tulosteet projekteille ja laskuille.
+- Yritysasetukset, maksuehdot ja logo.
+- Historia- ja yhteenvetonäkymät raportointiin.
+- Netlify-funktiot laskujen sähköpostitukseen ja AI-analyysiin.
 
-The main UI is split into four views:
-
-- `Yhteenveto` for dashboard metrics
-- `Seuranta` for project and time tracking
-- `Hallinta` for approvals and invoicing
-- `Historia` for historical review
-
-## Tech Stack
+## Teknologiat
 
 - React 19
 - TypeScript
 - Vite
-- Supabase JavaScript client
 - Tailwind CSS 4
+- Supabase JavaScript client
+- Supabase Auth ja Row Level Security
+- Netlify Functions
+- React PDF
+- Lucide React
 
-## Requirements
+## Vaatimukset
 
 - Node.js 20+
 - npm 10+
-- A Supabase project with the required tables
+- Supabase-projekti
+- Netlify CLI tai Netlify-projekti, jos haluat käyttää serverless-funktioita paikallisesti tai tuotannossa
 
-## Getting Started
+## Käyttöönotto
 
-1. Install dependencies:
+Asenna riippuvuudet:
 
 ```bash
 npm install
 ```
 
-2. Create a `.env` file in the project root with your Supabase credentials:
+Luo projektin juureen `.env`-tiedosto:
 
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
-3. Make sure your Supabase database schema is up to date.
+Jos käytät Netlify-funktioita, lisää nämä Netlifyn ympäristömuuttujiin tai paikalliseen ajotapaan:
 
-This repository currently includes the migration below for client billing fields:
+```env
+BREVO_API_KEY=your-brevo-api-key
+BREVO_SENDER_EMAIL=sender@example.com
+BREVO_SENDER_NAME=Iisiduuni
+OPENAI_API_KEY=your-openai-api-key
+```
 
-- `supabase/migrations/20260505_add_client_billing_fields.sql`
+Päivitä Supabase-tietokanta migraatioilla:
 
-If the base schema is not already present in your Supabase project, create the required tables first before applying the migration.
+```text
+supabase/migrations/
+  20260505_add_client_billing_fields.sql
+  20260518_add_auth_rls.sql
+  20260525_add_project_due_date.sql
+  20260525_add_tasks.sql
+  20260525_add_user_settings.sql
+```
 
-4. Start the development server:
+Käynnistä kehityspalvelin:
 
 ```bash
 npm run dev
 ```
 
-The app will be available at the local Vite development URL, typically `http://localhost:5173`.
+Vite avaa sovelluksen yleensä osoitteeseen `http://localhost:5173`.
 
-## Available Scripts
+## Komennot
 
 ```bash
-npm run dev
-npm run build
-npm run lint
-npm run preview
+npm run dev      # käynnistää kehityspalvelimen
 ```
 
-## Data Model Overview
+## Sovelluksen näkymät
 
-The app works primarily with four entities:
+- `Yhteenveto`: KPI:t, projektien tilanne ja tehtävien kokonaiskuva.
+- `Seuranta`: projektien luonti, tuntikirjaukset, projektilista ja tehtävät.
+- `Hallinta`: tuntien hyväksyntä ja laskujen muodostaminen.
+- `Historia`: projektien, laskujen ja tuntikirjausten tarkastelu.
+- `Asiakkaat`: asiakastietojen hallinta.
+- `Asetukset`: yritystiedot, maksuehdot ja logo laskuille.
+
+## Tietomalli
+
+Keskeiset taulut:
 
 - `clients`
 - `projects`
 - `time_entries`
 - `invoices`
+- `tasks`
+- `user_settings`
 
-At the TypeScript level these are defined in `src/types/types.ts`, and Supabase row-to-app mapping logic lives in `src/data/supabaseMappers.ts`.
+TypeScript-tyypit ovat tiedostossa `src/types/types.ts`. Supabasen rivimuunnokset sovelluksen domain-malleihin ovat tiedostossa `src/data/supabaseMappers.ts`.
 
-## Project Structure
+## Projektin rakenne
 
 ```text
 src/
-  components/        UI views for dashboard, tracking, approvals, invoicing, and history
-  data/              Supabase row mapping helpers
-  types/             Shared TypeScript domain types
-  utils/             Small utility helpers
-  supabaseClient.ts  Supabase client initialization
+  components/        Sovelluksen näkymät ja käyttöliittymäkomponentit
+  data/              Supabase-mapperit
+  types/             Domain-tyypit
+  utils/             Yleiset apufunktiot
+  supabaseClient.ts  Supabase-clientin alustus
+
+netlify/
+  functions/         Serverless-funktiot sähköpostille ja AI-analyysille
+
 supabase/
-  migrations/        SQL migrations
+  migrations/        Tietokantamuutokset
 ```
 
-## Notes
+## Netlify
 
-- The app fails fast if `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` is missing.
-- Supabase access is initialized in `src/supabaseClient.ts`.
-- The current implementation loads clients, projects, time entries, and invoices on app startup.
+`netlify.toml` määrittää tuotantobuildin:
 
-## Build
-
-Production build:
-
-```bash
-npm run build
+```toml
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
 ```
 
-This runs TypeScript project builds first and then creates the Vite production bundle.
+Sähköpostilähetys käyttää Brevon SMTP APIa funktion `send-invoice-email` kautta. AI-analyysi käyttää funktiota `ai-analyze`, joka välittää pyynnön OpenAI APIlle.
+
+## Huomioita kehitykseen
+
+- Sovellus kaatuu tarkoituksella heti, jos `VITE_SUPABASE_URL` tai `VITE_SUPABASE_ANON_KEY` puuttuu.
+- Data ladataan kirjautuneelle käyttäjälle Supabasesta sovelluksen käynnistyessä.
+- Migraatio `20260518_add_auth_rls.sql` lisää autentikointiin ja RLS-käyttöön liittyviä muutoksia.
+- Älä commitoi `.env`-tiedostoa tai API-avaimia.
+
