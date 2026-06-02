@@ -10,17 +10,20 @@ import { SettingsView } from './components/SettingsView'
 import { InvoicingView } from './components/InvoicingView'
 import { NewProjectForm } from './components/NewProjectForm'
 import { ProjectList } from './components/ProjectList'
+import { PurchasesView } from './components/PurchasesView'
 import { TimeTracker } from './components/TimeTracker'
 import {
   mapClientRow,
   mapInvoiceRow,
   mapProjectRow,
+  mapPurchaseRow,
   mapTaskRow,
   mapTimeEntryRow,
   mapUserSettingsRow,
   toClientInsert,
   toInvoiceInsert,
   toProjectInsert,
+  toPurchaseInsert,
   toTimeEntryInsert,
 } from './data/supabaseMappers'
 import { supabase } from './supabaseClient'
@@ -35,9 +38,12 @@ import type {
   InvoiceStatus,
   NewClient,
   NewProject,
+  NewPurchase,
   NewTimeEntry,
   Project,
   ProjectRow,
+  Purchase,
+  PurchaseRow,
   Task,
   TaskRow,
   TimeEntry,
@@ -46,7 +52,15 @@ import type {
 } from './types/types'
 import { defaultCompanySettings } from './types/types'
 
-type AppView = 'dashboard' | 'tracker' | 'management' | 'history' | 'clients' | 'settings'
+type AppView = 'dashboard' | 'tracker' | 'management' | 'purchases' | 'history' | 'clients' | 'settings'
+
+const appViews: AppView[] = ['dashboard', 'tracker', 'management', 'purchases', 'history', 'clients', 'settings']
+const activeViewStorageKey = 'erp-active-view'
+
+function getInitialActiveView(): AppView {
+  const storedView = window.localStorage.getItem(activeViewStorageKey)
+  return appViews.includes(storedView as AppView) ? storedView as AppView : 'dashboard'
+}
 
 function getNextInvoiceNumber(existingInvoices: Invoice[], invoiceDate: string) {
   const year = invoiceDate.slice(0, 4)
@@ -72,11 +86,12 @@ function getNextInvoiceNumber(existingInvoices: Invoice[], invoiceDate: string) 
 
 function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
-  const [activeView, setActiveView] = useState<AppView>('dashboard')
+  const [activeView, setActiveView] = useState<AppView>(getInitialActiveView)
   const [clients, setClients] = useState<Client[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [purchases, setPurchases] = useState<Purchase[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [companySettings, setCompanySettings] = useState<CompanySettings>(defaultCompanySettings)
   const [logoSrc, setLogoSrc] = useState<string>('')
@@ -110,11 +125,12 @@ function App() {
     async function loadData() {
       setIsDataLoading(true)
 
-      const [clientsResponse, projectsResponse, timeEntriesResponse, invoicesResponse, settingsResponse, tasksResponse] = await Promise.all([
+      const [clientsResponse, projectsResponse, timeEntriesResponse, invoicesResponse, purchasesResponse, settingsResponse, tasksResponse] = await Promise.all([
         supabase.from('clients').select('*'),
         supabase.from('projects').select('*'),
         supabase.from('time_entries').select('*'),
         supabase.from('invoices').select('*'),
+        supabase.from('purchases').select('*').order('created_at', { ascending: false }),
         supabase.from('user_settings').select('*').maybeSingle(),
         supabase.from('tasks').select('*').order('due_date', { ascending: true, nullsFirst: false }),
       ])
@@ -124,6 +140,7 @@ function App() {
         projectsResponse.error ??
         timeEntriesResponse.error ??
         invoicesResponse.error ??
+        purchasesResponse.error ??
         settingsResponse.error ??
         tasksResponse.error
 
@@ -144,6 +161,7 @@ function App() {
       setProjects((projectsResponse.data as ProjectRow[]).map(mapProjectRow))
       setTimeEntries((timeEntriesResponse.data as TimeEntryRow[]).map(mapTimeEntryRow))
       setInvoices((invoicesResponse.data as InvoiceRow[]).map(mapInvoiceRow))
+      setPurchases((purchasesResponse.data as PurchaseRow[]).map(mapPurchaseRow))
       setTasks((tasksResponse.data as TaskRow[]).map(mapTaskRow))
 
       if (settingsResponse.data) {
@@ -162,9 +180,14 @@ function App() {
     }
   }, [sessionUserId])
 
+  useEffect(() => {
+    window.localStorage.setItem(activeViewStorageKey, activeView)
+  }, [activeView])
+
 
   const draftCount = timeEntries.filter((entry) => entry.status === 'draft').length
   const approvedCount = timeEntries.filter((entry) => entry.status === 'approved').length
+  const openPurchaseCount = purchases.filter((purchase) => purchase.status !== 'paid').length
 
   const navigationItems: Array<{ id: AppView; label: string; hint: string }> = [
     { id: 'dashboard', label: 'Yhteenveto', hint: 'Raportit ja KPI:t' },
@@ -175,6 +198,7 @@ function App() {
 
   const sidebarItems: Array<{ id: AppView; label: string; hint: string }> = [
     { id: 'dashboard', label: 'Laskutus ja projektinhallinta', hint: 'Takaisin päänäkymään' },
+    { id: 'purchases', label: 'Ostot', hint: 'Hankinnat ja PO:t' },
     { id: 'clients', label: 'Asiakkaat', hint: 'Asiakashallinta' },
     { id: 'settings', label: 'Asetukset', hint: 'Yritystiedot ja logo' },
   ]
@@ -399,6 +423,68 @@ function App() {
     )
   }
 
+  async function handleCreatePurchase(purchase: NewPurchase) {
+    const { data, error } = await supabase
+      .from('purchases')
+      .insert([toPurchaseInsert(purchase)])
+      .select('*')
+      .single()
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    const createdPurchase = mapPurchaseRow(data as PurchaseRow)
+    setPurchases((currentPurchases) => [createdPurchase, ...currentPurchases])
+    return createdPurchase
+  }
+
+  async function handleUpdatePurchase(purchaseId: string, data: Partial<NewPurchase>) {
+    const updateData: Record<string, string | number | null> = {}
+
+    if (data.supplierName !== undefined) updateData.supplier_name = data.supplierName
+    if (data.title !== undefined) updateData.title = data.title
+    if (data.description !== undefined) updateData.description = data.description
+    if (data.requestedBy !== undefined) updateData.requested_by = data.requestedBy
+    if (data.orderNumber !== undefined) updateData.order_number = data.orderNumber
+    if (data.amount !== undefined) updateData.amount = data.amount
+    if (data.status !== undefined) updateData.status = data.status
+    if (data.expectedDate !== undefined) updateData.expected_date = data.expectedDate
+    if (data.receivedDate !== undefined) updateData.received_date = data.receivedDate
+    if (data.invoiceReference !== undefined) updateData.invoice_reference = data.invoiceReference
+    if (data.invoiceAttachmentName !== undefined) updateData.invoice_attachment_name = data.invoiceAttachmentName
+    if (data.invoiceAttachmentDataUrl !== undefined) updateData.invoice_attachment_data_url = data.invoiceAttachmentDataUrl
+
+    const { data: updatedData, error } = await supabase
+      .from('purchases')
+      .update(updateData)
+      .eq('id', purchaseId)
+      .select('*')
+      .single()
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    const updatedPurchase = mapPurchaseRow(updatedData as PurchaseRow)
+    setPurchases((currentPurchases) =>
+      currentPurchases.map((purchase) => (purchase.id === purchaseId ? updatedPurchase : purchase)),
+    )
+  }
+
+  async function handleDeletePurchase(purchaseId: string) {
+    const { error } = await supabase
+      .from('purchases')
+      .delete()
+      .eq('id', purchaseId)
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    setPurchases((currentPurchases) => currentPurchases.filter((purchase) => purchase.id !== purchaseId))
+  }
+
   function renderActiveView() {
     if (activeView === 'settings') {
       return (
@@ -440,6 +526,18 @@ function App() {
             onTaskChange={handleTaskChange}
           />
         </div>
+      )
+    }
+
+    if (activeView === 'purchases') {
+      return (
+        <PurchasesView
+          purchases={purchases}
+          currentUserName={session?.user.user_metadata?.name ?? session?.user.email ?? ''}
+          onCreatePurchase={handleCreatePurchase}
+          onUpdatePurchase={handleUpdatePurchase}
+          onDeletePurchase={handleDeletePurchase}
+        />
       )
     }
 
@@ -500,7 +598,7 @@ function App() {
 
   const userId = session.user.id
 
-  const isSideView = activeView === 'clients' || activeView === 'settings'
+  const isSideView = activeView === 'clients' || activeView === 'purchases' || activeView === 'settings'
 
   const sidebarDrawer = (
     <>
@@ -555,8 +653,18 @@ function App() {
     </>
   )
 
-  const sideViewTitle = activeView === 'clients' ? 'Asiakkaat' : 'Asetukset'
-  const sideViewHint = activeView === 'clients' ? 'Asiakashallinta' : 'Yritystiedot ja logo'
+  const sideViewTitle =
+    activeView === 'clients'
+      ? 'Asiakkaat'
+      : activeView === 'purchases'
+        ? 'Ostot'
+        : 'Asetukset'
+  const sideViewHint =
+    activeView === 'clients'
+      ? 'Asiakashallinta'
+      : activeView === 'purchases'
+        ? 'Hankinnat ja PO:t'
+        : 'Yritystiedot ja logo'
 
   if (isSideView) {
     return (
@@ -632,7 +740,7 @@ function App() {
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-2xl border-2 border-slate-800 bg-slate-950 px-5 py-4 text-white">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Asiakkaat</p>
                 <p className="mt-2 text-2xl font-semibold">{clients.length}</p>
@@ -644,6 +752,10 @@ function App() {
               <div className="rounded-2xl border-2 border-slate-400 bg-white px-5 py-4 text-slate-950">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Laskut</p>
                 <p className="mt-2 text-2xl font-semibold">{invoices.length}</p>
+              </div>
+              <div className="rounded-2xl border-2 border-slate-400 bg-white px-5 py-4 text-slate-950">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Avoimet ostot</p>
+                <p className="mt-2 text-2xl font-semibold">{openPurchaseCount}</p>
               </div>
             </div>
           </div>

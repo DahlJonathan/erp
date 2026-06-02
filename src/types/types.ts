@@ -97,6 +97,44 @@ export interface InvoiceRow {
     status: InvoiceStatus
 }
 
+export type PurchaseStatus = 'draft' | 'ordered' | 'received' | 'paid'
+
+export interface Purchase {
+    id: string
+    supplierName: string
+    title: string
+    description: string
+    requestedBy: string
+    orderNumber: string | null
+    amount: number
+    status: PurchaseStatus
+    expectedDate: string | null
+    receivedDate: string | null
+    invoiceReference: string | null
+    invoiceAttachmentName: string | null
+    invoiceAttachmentDataUrl: string | null
+    createdAt: string
+}
+
+export type NewPurchase = Omit<Purchase, 'id' | 'createdAt'>
+
+export interface PurchaseRow {
+    id: string
+    supplier_name: string
+    title: string
+    description: string
+    requested_by: string
+    order_number: string | null
+    amount: number
+    status: PurchaseStatus
+    expected_date: string | null
+    received_date: string | null
+    invoice_reference: string | null
+    invoice_attachment_name: string | null
+    invoice_attachment_data_url: string | null
+    created_at: string
+}
+
 export type CompanySettings = {
     name: string
     businessId: string

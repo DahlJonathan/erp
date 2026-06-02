@@ -6,10 +6,13 @@ import type {
     InvoiceRow,
     NewClient,
     NewProject,
+    NewPurchase,
     NewTask,
     NewTimeEntry,
     Project,
     ProjectRow,
+    Purchase,
+    PurchaseRow,
     Task,
     TaskRow,
     TimeEntry,
@@ -111,6 +114,42 @@ export function toInvoiceInsert(invoice: Omit<Invoice, 'id'>) {
         invoice_number: invoice.invoiceNumber,
         total_amount: invoice.totalAmount,
         status: invoice.status,
+    }
+}
+
+export function mapPurchaseRow(row: PurchaseRow): Purchase {
+    return {
+        id: row.id,
+        supplierName: row.supplier_name,
+        title: row.title,
+        description: row.description,
+        requestedBy: row.requested_by,
+        orderNumber: row.order_number,
+        amount: row.amount,
+        status: row.status,
+        expectedDate: row.expected_date,
+        receivedDate: row.received_date,
+        invoiceReference: row.invoice_reference,
+        invoiceAttachmentName: row.invoice_attachment_name,
+        invoiceAttachmentDataUrl: row.invoice_attachment_data_url,
+        createdAt: row.created_at,
+    }
+}
+
+export function toPurchaseInsert(purchase: NewPurchase) {
+    return {
+        supplier_name: purchase.supplierName,
+        title: purchase.title,
+        description: purchase.description,
+        requested_by: purchase.requestedBy,
+        order_number: purchase.orderNumber,
+        amount: purchase.amount,
+        status: purchase.status,
+        expected_date: purchase.expectedDate,
+        received_date: purchase.receivedDate,
+        invoice_reference: purchase.invoiceReference,
+        invoice_attachment_name: purchase.invoiceAttachmentName,
+        invoice_attachment_data_url: purchase.invoiceAttachmentDataUrl,
     }
 }
 
