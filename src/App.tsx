@@ -198,7 +198,7 @@ function App() {
 
   const sidebarItems: Array<{ id: AppView; label: string; hint: string }> = [
     { id: 'dashboard', label: 'Laskutus ja projektinhallinta', hint: 'Takaisin päänäkymään' },
-    { id: 'purchases', label: 'Ostot', hint: 'Hankinnat ja PO:t' },
+    { id: 'purchases', label: 'Hankinnat', hint: 'Hankinnat ja PO:t' },
     { id: 'clients', label: 'Asiakkaat', hint: 'Asiakashallinta' },
     { id: 'settings', label: 'Asetukset', hint: 'Yritystiedot ja logo' },
   ]
@@ -657,7 +657,7 @@ function App() {
     activeView === 'clients'
       ? 'Asiakkaat'
       : activeView === 'purchases'
-        ? 'Ostot'
+        ? 'Hankinnat'
         : 'Asetukset'
   const sideViewHint =
     activeView === 'clients'
@@ -754,7 +754,7 @@ function App() {
                 <p className="mt-2 text-2xl font-semibold">{invoices.length}</p>
               </div>
               <div className="rounded-2xl border-2 border-slate-400 bg-white px-5 py-4 text-slate-950">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Avoimet ostot</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Avoimet hankinnat</p>
                 <p className="mt-2 text-2xl font-semibold">{openPurchaseCount}</p>
               </div>
             </div>

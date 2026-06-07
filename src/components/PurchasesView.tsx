@@ -58,7 +58,7 @@ const statusSteps: Array<{
     },
     {
         status: 'paid',
-        label: 'Laskutettu & Maksettu',
+        label: 'Maksettu',
         hint: 'Ostolasku on linkitetty ja maksu kuitattu.',
         icon: Check,
     },
@@ -271,7 +271,7 @@ export function PurchasesView({
                 <div>
                     <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">Ostohallinta</p>
                     <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-                        Ostopyynnöt ja tilausseuranta
+                        Hankinnat ja tilausseuranta
                     </h2>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
                         Seuraa hankinnan etenemistä pyynnöstä PO-tilaukseen, vastaanottoon ja maksettuun ostolaskuun.
@@ -292,7 +292,7 @@ export function PurchasesView({
                         className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
                     >
                         <Plus size={17} />
-                        {isFormOpen ? 'Sulje' : 'Uusi ostopyyntö'}
+                        {isFormOpen ? 'Sulje' : 'Uusi hankinta'}
                     </button>
                 </div>
             </div>
@@ -315,10 +315,10 @@ export function PurchasesView({
 
             {isFormOpen ? (
                 <form onSubmit={handleCreatePurchase} className="mt-6 rounded-2xl border-2 border-slate-400 bg-slate-50 p-5">
-                    <h3 className="text-lg font-semibold text-slate-950">Uusi ostopyyntö</h3>
+                    <h3 className="text-lg font-semibold text-slate-950">Uusi hankinta</h3>
                     <div className="mt-4 grid gap-4 md:grid-cols-2">
                         <FormInput label="Toimittaja *" value={form.supplierName} onChange={(value) => updateFormField('supplierName', value)} disabled={isSaving} />
-                        <FormInput label="Ostopyyntö *" value={form.title} onChange={(value) => updateFormField('title', value)} disabled={isSaving} />
+                        <FormInput label="Hankinta *" value={form.title} onChange={(value) => updateFormField('title', value)} disabled={isSaving} />
                         <FormInput label="Pyytäjä" value={form.requestedBy} onChange={(value) => updateFormField('requestedBy', value)} disabled={isSaving} />
                         <FormInput label="PO-numero" value={form.orderNumber} onChange={(value) => updateFormField('orderNumber', value)} disabled={isSaving} />
                         <FormInput label="Arvioitu summa" value={form.amount} onChange={(value) => updateFormField('amount', value)} disabled={isSaving} inputMode="decimal" />
@@ -344,7 +344,7 @@ export function PurchasesView({
                             className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             <Check size={16} />
-                            {isSaving ? 'Tallennetaan...' : 'Tallenna ostopyyntö'}
+                            {isSaving ? 'Tallennetaan...' : 'Tallenna hankinta'}
                         </button>
                     </div>
                 </form>
@@ -357,7 +357,7 @@ export function PurchasesView({
             <div className="mt-6 space-y-4">
                 {orderedPurchases.length === 0 ? (
                     <div className="rounded-2xl border-2 border-dashed border-slate-400 bg-slate-50 p-6 text-center text-sm text-slate-600">
-                        Ei ostopyyntöjä vielä. Luo ensimmäinen ostopyyntö ylhäältä.
+                        Ei hankintoja vielä. Luo ensimmäinen hankinta ylhäältä.
                     </div>
                 ) : (
                     orderedPurchases.map((purchase) => {
@@ -478,7 +478,7 @@ export function PurchasesView({
                             </div>
                             <div className="min-w-0">
                                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                    {invoiceModalMarksPaid ? 'Laskutettu & maksettu' : 'Ostolasku'}
+                                    {invoiceModalMarksPaid ? 'Maksettu' : 'Ostolasku'}
                                 </p>
                                 <h3 className="mt-2 text-xl font-semibold text-slate-950">
                                     {invoiceModalMarksPaid ? 'Lisää ostolaskun viite' : 'Liitä lasku ostoon'}
