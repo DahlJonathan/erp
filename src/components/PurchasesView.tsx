@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Check, FileText, PackageCheck, Paperclip, Plus, Send, Trash2, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, FileText, PackageCheck, Paperclip, Pencil, Plus, Send, Trash2, X } from 'lucide-react'
 
 import type { NewPurchase, Purchase, PurchaseStatus } from '../types/types'
 import { formatFinnishDate, getTodayIsoDate } from '../utils/date'
@@ -85,6 +85,8 @@ export function PurchasesView({
     onDeletePurchase,
 }: PurchasesViewProps) {
     const [isFormOpen, setIsFormOpen] = useState(false)
+    const [activeTab, setActiveTab] = useState<'tracking' | 'all'>('tracking')
+    const [expandedPurchaseIds, setExpandedPurchaseIds] = useState<Set<string>>(new Set())
     const [form, setForm] = useState<PurchaseFormState>({ ...emptyForm, requestedBy: currentUserName })
     const [formError, setFormError] = useState<string | null>(null)
     const [isSaving, setIsSaving] = useState(false)
@@ -95,6 +97,10 @@ export function PurchasesView({
     const [invoiceReferenceInput, setInvoiceReferenceInput] = useState('')
     const [invoiceAttachmentName, setInvoiceAttachmentName] = useState('')
     const [invoiceAttachmentDataUrl, setInvoiceAttachmentDataUrl] = useState<string | null>(null)
+    const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null)
+    const [editForm, setEditForm] = useState<PurchaseFormState>({ ...emptyForm })
+    const [editFormError, setEditFormError] = useState<string | null>(null)
+    const [isEditSaving, setIsEditSaving] = useState(false)
 
     const orderedPurchases = useMemo(
         () => [...purchases].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -111,6 +117,23 @@ export function PurchasesView({
     const openAmount = purchases
         .filter((purchase) => purchase.status !== 'paid')
         .reduce((sum, purchase) => sum + purchase.amount, 0)
+
+    const trackingPurchases = useMemo(
+        () => orderedPurchases.filter((p) => p.status !== 'paid'),
+        [orderedPurchases],
+    )
+
+    function toggleExpanded(id: string) {
+        setExpandedPurchaseIds((prev) => {
+            const next = new Set(prev)
+            if (next.has(id)) {
+                next.delete(id)
+            } else {
+                next.add(id)
+            }
+            return next
+        })
+    }
 
     function updateFormField(field: keyof PurchaseFormState, value: string) {
         setForm((current) => ({ ...current, [field]: value }))
@@ -253,6 +276,65 @@ export function PurchasesView({
         setInvoiceAttachmentDataUrl(null)
     }
 
+    function openEditModal(purchase: Purchase) {
+        setEditingPurchase(purchase)
+        setEditForm({
+            supplierName: purchase.supplierName,
+            title: purchase.title,
+            description: purchase.description,
+            requestedBy: purchase.requestedBy,
+            orderNumber: purchase.orderNumber ?? '',
+            amount: purchase.amount > 0 ? String(purchase.amount) : '',
+            expectedDate: purchase.expectedDate ?? '',
+        })
+        setEditFormError(null)
+    }
+
+    function closeEditModal() {
+        setEditingPurchase(null)
+        setEditFormError(null)
+    }
+
+    function updateEditFormField(field: keyof PurchaseFormState, value: string) {
+        setEditForm((current) => ({ ...current, [field]: value }))
+    }
+
+    async function handleEditSave(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault()
+        if (!editingPurchase) return
+
+        if (!editForm.supplierName.trim() || !editForm.title.trim()) {
+            setEditFormError('Toimittaja ja otsikko ovat pakollisia.')
+            return
+        }
+
+        const amount = Number(editForm.amount.replace(',', '.')) || 0
+
+        setIsEditSaving(true)
+        setEditFormError(null)
+        try {
+            await onUpdatePurchase(editingPurchase.id, {
+                supplierName: editForm.supplierName.trim(),
+                title: editForm.title.trim(),
+                description: editForm.description.trim(),
+                requestedBy: editForm.requestedBy.trim() || currentUserName,
+                orderNumber: editForm.orderNumber.trim() || null,
+                amount,
+                expectedDate: editForm.expectedDate || null,
+                status: editingPurchase.status,
+                receivedDate: editingPurchase.receivedDate,
+                invoiceReference: editingPurchase.invoiceReference,
+                invoiceAttachmentName: editingPurchase.invoiceAttachmentName,
+                invoiceAttachmentDataUrl: editingPurchase.invoiceAttachmentDataUrl,
+            })
+            closeEditModal()
+        } catch (error) {
+            setEditFormError(error instanceof Error ? error.message : 'Tallennus epäonnistui.')
+        } finally {
+            setIsEditSaving(false)
+        }
+    }
+
     async function deletePurchase(purchaseId: string) {
         setBusyPurchaseId(purchaseId)
         setActionError(null)
@@ -297,21 +379,49 @@ export function PurchasesView({
                 </div>
             </div>
 
-            <div className="mt-6 grid gap-3 md:grid-cols-4">
-                {statusSteps.map((step) => {
-                    const Icon = step.icon
-                    return (
-                        <div key={step.status} className="rounded-2xl border-2 border-slate-300 bg-slate-50 p-4">
-                            <div className="flex items-center justify-between gap-3">
-                                <Icon size={18} className="text-slate-600" />
-                                <span className="text-2xl font-semibold text-slate-950">{totalsByStatus[step.status]}</span>
-                            </div>
-                            <p className="mt-3 text-sm font-semibold text-slate-950">{step.label}</p>
-                            <p className="mt-1 text-xs leading-5 text-slate-600">{step.hint}</p>
-                        </div>
-                    )
-                })}
+            {/* Tab navigation */}
+            <div className="mt-6 flex gap-1 border-b-2 border-slate-300">
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('tracking')}
+                    className={`rounded-t-xl px-5 py-2.5 text-sm font-semibold transition ${
+                        activeTab === 'tracking'
+                            ? 'border-2 border-b-0 border-slate-400 bg-white text-slate-950'
+                            : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                >
+                    Tilausseuranta{trackingPurchases.length > 0 ? ` (${trackingPurchases.length})` : ''}
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('all')}
+                    className={`rounded-t-xl px-5 py-2.5 text-sm font-semibold transition ${
+                        activeTab === 'all'
+                            ? 'border-2 border-b-0 border-slate-400 bg-white text-slate-950'
+                            : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                >
+                    Kaikki hankinnat{orderedPurchases.length > 0 ? ` (${orderedPurchases.length})` : ''}
+                </button>
             </div>
+
+            {activeTab === 'tracking' ? (
+                <div className="mt-6 grid gap-3 md:grid-cols-4">
+                    {statusSteps.filter((s) => s.status !== 'paid').map((step) => {
+                        const Icon = step.icon
+                        return (
+                            <div key={step.status} className="rounded-2xl border-2 border-slate-300 bg-slate-50 p-4">
+                                <div className="flex items-center justify-between gap-3">
+                                    <Icon size={18} className="text-slate-600" />
+                                    <span className="text-2xl font-semibold text-slate-950">{totalsByStatus[step.status]}</span>
+                                </div>
+                                <p className="mt-3 text-sm font-semibold text-slate-950">{step.label}</p>
+                                <p className="mt-1 text-xs leading-5 text-slate-600">{step.hint}</p>
+                            </div>
+                        )
+                    })}
+                </div>
+            ) : null}
 
             {isFormOpen ? (
                 <form onSubmit={handleCreatePurchase} className="mt-6 rounded-2xl border-2 border-slate-400 bg-slate-50 p-5">
@@ -354,117 +464,346 @@ export function PurchasesView({
                 <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{actionError}</div>
             ) : null}
 
-            <div className="mt-6 space-y-4">
-                {orderedPurchases.length === 0 ? (
-                    <div className="rounded-2xl border-2 border-dashed border-slate-400 bg-slate-50 p-6 text-center text-sm text-slate-600">
-                        Ei hankintoja vielä. Luo ensimmäinen hankinta ylhäältä.
-                    </div>
-                ) : (
-                    orderedPurchases.map((purchase) => {
-                        const nextStatus = getNextStatus(purchase.status)
-                        const isBusy = busyPurchaseId === purchase.id
-                        const activeIndex = getStatusIndex(purchase.status)
+            {activeTab === 'tracking' ? (
+                <div className="mt-6 space-y-4">
+                    {trackingPurchases.length === 0 ? (
+                        <div className="rounded-2xl border-2 border-dashed border-slate-400 bg-slate-50 p-6 text-center text-sm text-slate-600">
+                            Ei avoimia tilauksia. Kaikki hankinnat on maksettu tai hankintoja ei ole vielä tehty.
+                        </div>
+                    ) : (
+                        trackingPurchases.map((purchase) => {
+                            const nextStatus = getNextStatus(purchase.status)
+                            const isBusy = busyPurchaseId === purchase.id
+                            const activeIndex = getStatusIndex(purchase.status)
 
-                        return (
-                            <article key={purchase.id} className="rounded-2xl border-2 border-slate-300 bg-slate-50 p-5">
-                                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                    <div className="min-w-0">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <p className="text-lg font-semibold text-slate-950">{purchase.title}</p>
-                                            <span className="rounded-full border border-slate-400 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-                                                {statusLabels[purchase.status]}
-                                            </span>
-                                        </div>
-                                        <p className="mt-1 text-sm text-slate-600">
-                                            {purchase.supplierName} • {purchase.requestedBy || 'Pyytäjä puuttuu'} • {formatFinnishDate(purchase.createdAt.slice(0, 10))}
-                                        </p>
-                                        {purchase.description ? (
-                                            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-700">{purchase.description}</p>
-                                        ) : null}
-                                    </div>
-
-                                    <div className="text-left lg:text-right">
-                                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Summa</p>
-                                        <p className="mt-1 text-2xl font-semibold text-slate-950">{purchase.amount.toFixed(2)} EUR</p>
-                                    </div>
-                                </div>
-
-                                <div className="mt-5 grid gap-3 md:grid-cols-4">
-                                    {statusSteps.map((step, index) => {
-                                        const isDone = index <= activeIndex
-                                        const Icon = step.icon
-                                        return (
-                                            <div
-                                                key={step.status}
-                                                className={`rounded-2xl border-2 p-3 ${
-                                                    isDone
-                                                        ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
-                                                        : 'border-slate-300 bg-white text-slate-500'
-                                                }`}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <Icon size={16} />
-                                                    <p className="text-sm font-semibold">{step.label}</p>
-                                                </div>
+                            return (
+                                <article key={purchase.id} className="rounded-2xl border-2 border-slate-300 bg-slate-50 p-5">
+                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                        <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="text-lg font-semibold text-slate-950">{purchase.title}</p>
+                                                <span className="rounded-full border border-slate-400 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                                                    {statusLabels[purchase.status]}
+                                                </span>
                                             </div>
-                                        )
-                                    })}
-                                </div>
+                                            <p className="mt-1 text-sm text-slate-600">
+                                                {purchase.supplierName} • {purchase.requestedBy || 'Pyytäjä puuttuu'} • {formatFinnishDate(purchase.createdAt.slice(0, 10))}
+                                            </p>
+                                            {purchase.description ? (
+                                                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-700">{purchase.description}</p>
+                                            ) : null}
+                                        </div>
 
-                                <dl className="mt-5 grid gap-3 border-t-2 border-slate-300 pt-5 sm:grid-cols-2 lg:grid-cols-4">
-                                    <PurchaseDetail label="PO-numero" value={purchase.orderNumber ?? '-'} />
-                                    <PurchaseDetail label="Odotettu toimitus" value={purchase.expectedDate ? formatFinnishDate(purchase.expectedDate) : '-'} />
-                                    <PurchaseDetail label="Vastaanotettu" value={purchase.receivedDate ? formatFinnishDate(purchase.receivedDate) : '-'} />
-                                    <PurchaseDetail label="Laskuviite" value={purchase.invoiceReference ?? '-'} />
-                                </dl>
+                                        <div className="text-left lg:text-right">
+                                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Summa</p>
+                                            <p className="mt-1 text-2xl font-semibold text-slate-950">{purchase.amount.toFixed(2)} EUR</p>
+                                        </div>
+                                    </div>
 
-                                <div className="mt-5 flex flex-wrap justify-end gap-2">
-                                    {purchase.invoiceAttachmentDataUrl ? (
-                                        <a
-                                            href={purchase.invoiceAttachmentDataUrl}
-                                            download={purchase.invoiceAttachmentName ?? 'ostolasku'}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                                        >
-                                            <Paperclip size={15} />
-                                            Avaa lasku
-                                        </a>
-                                    ) : null}
-                                    <button
-                                        type="button"
-                                        onClick={() => openInvoiceModal(purchase, false)}
-                                        disabled={isBusy}
-                                        className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
-                                    >
-                                        <Paperclip size={15} />
-                                        {purchase.invoiceAttachmentDataUrl ? 'Vaihda lasku' : 'Liitä lasku'}
-                                    </button>
-                                    {nextStatus ? (
+                                    <div className="mt-5 grid gap-3 md:grid-cols-4">
+                                        {statusSteps.map((step, index) => {
+                                            const isDone = index <= activeIndex
+                                            const Icon = step.icon
+                                            return (
+                                                <div
+                                                    key={step.status}
+                                                    className={`rounded-2xl border-2 p-3 ${
+                                                        isDone
+                                                            ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+                                                            : 'border-slate-300 bg-white text-slate-500'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <Icon size={16} />
+                                                        <p className="text-sm font-semibold">{step.label}</p>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+
+                                    <dl className="mt-5 grid gap-3 border-t-2 border-slate-300 pt-5 sm:grid-cols-2 lg:grid-cols-4">
+                                        <PurchaseDetail label="PO-numero" value={purchase.orderNumber ?? '-'} />
+                                        <PurchaseDetail label="Odotettu toimitus" value={purchase.expectedDate ? formatFinnishDate(purchase.expectedDate) : '-'} />
+                                        <PurchaseDetail label="Vastaanotettu" value={purchase.receivedDate ? formatFinnishDate(purchase.receivedDate) : '-'} />
+                                        <PurchaseDetail label="Laskuviite" value={purchase.invoiceReference ?? '-'} />
+                                    </dl>
+
+                                    <div className="mt-5 flex flex-wrap justify-end gap-2">
+                                        {purchase.invoiceAttachmentDataUrl ? (
+                                            <a
+                                                href={purchase.invoiceAttachmentDataUrl}
+                                                download={purchase.invoiceAttachmentName ?? 'ostolasku'}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                                            >
+                                                <Paperclip size={15} />
+                                                Avaa lasku
+                                            </a>
+                                        ) : null}
                                         <button
                                             type="button"
-                                            onClick={() => void advancePurchase(purchase)}
+                                            onClick={() => openInvoiceModal(purchase, false)}
                                             disabled={isBusy}
-                                            className="rounded-xl border-2 border-emerald-400 bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-200 disabled:cursor-wait disabled:opacity-60"
+                                            className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
                                         >
-                                            {isBusy ? 'Tallennetaan...' : `Siirrä tilaan: ${statusLabels[nextStatus]}`}
+                                            <Paperclip size={15} />
+                                            {purchase.invoiceAttachmentDataUrl ? 'Vaihda lasku' : 'Liitä lasku'}
                                         </button>
-                                    ) : null}
+                                        {nextStatus ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => void advancePurchase(purchase)}
+                                                disabled={isBusy}
+                                                className="rounded-xl border-2 border-emerald-400 bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-200 disabled:cursor-wait disabled:opacity-60"
+                                            >
+                                                {isBusy ? 'Tallennetaan...' : `Siirrä tilaan: ${statusLabels[nextStatus]}`}
+                                            </button>
+                                        ) : null}
+                                        <button
+                                            type="button"
+                                            onClick={() => openEditModal(purchase)}
+                                            disabled={isBusy}
+                                            className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
+                                        >
+                                            <Pencil size={15} />
+                                            Muokkaa
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => void deletePurchase(purchase.id)}
+                                            disabled={isBusy}
+                                            className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-wait disabled:opacity-60"
+                                        >
+                                            <Trash2 size={15} />
+                                            Poista
+                                        </button>
+                                    </div>
+                                </article>
+                            )
+                        })
+                    )}
+                </div>
+            ) : (
+                /* Kaikki hankinnat — tiivistettävä lista */
+                <div className="mt-6 space-y-2">
+                    {orderedPurchases.length === 0 ? (
+                        <div className="rounded-2xl border-2 border-dashed border-slate-400 bg-slate-50 p-6 text-center text-sm text-slate-600">
+                            Ei hankintoja vielä. Luo ensimmäinen hankinta ylhäältä.
+                        </div>
+                    ) : (
+                        orderedPurchases.map((purchase) => {
+                            const isExpanded = expandedPurchaseIds.has(purchase.id)
+                            const nextStatus = getNextStatus(purchase.status)
+                            const isBusy = busyPurchaseId === purchase.id
+                            const activeIndex = getStatusIndex(purchase.status)
+                            const isPaid = purchase.status === 'paid'
+
+                            return (
+                                <article
+                                    key={purchase.id}
+                                    className={`rounded-2xl border-2 ${isPaid ? 'border-slate-200 bg-slate-50/60' : 'border-slate-300 bg-slate-50'}`}
+                                >
+                                    {/* Compact row — always visible */}
                                     <button
                                         type="button"
-                                        onClick={() => void deletePurchase(purchase.id)}
-                                        disabled={isBusy}
-                                        className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-wait disabled:opacity-60"
+                                        onClick={() => toggleExpanded(purchase.id)}
+                                        className="flex w-full items-center gap-3 px-5 py-4 text-left"
                                     >
-                                        <Trash2 size={15} />
-                                        Poista
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className={`text-sm font-semibold ${isPaid ? 'text-slate-500' : 'text-slate-950'}`}>
+                                                    {purchase.title}
+                                                </span>
+                                                <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                                                    isPaid
+                                                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                                                        : 'border-slate-400 bg-white text-slate-700'
+                                                }`}>
+                                                    {statusLabels[purchase.status]}
+                                                </span>
+                                            </div>
+                                            <p className="mt-0.5 text-xs text-slate-500">
+                                                {purchase.supplierName} • {formatFinnishDate(purchase.createdAt.slice(0, 10))}
+                                            </p>
+                                        </div>
+                                        <div className="shrink-0 text-right">
+                                            <p className={`text-sm font-semibold ${isPaid ? 'text-slate-400' : 'text-slate-950'}`}>
+                                                {purchase.amount.toFixed(2)} EUR
+                                            </p>
+                                        </div>
+                                        <div className="ml-2 shrink-0 text-slate-400">
+                                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                        </div>
                                     </button>
+
+                                    {/* Expanded details */}
+                                    {isExpanded ? (
+                                        <div className="border-t-2 border-slate-300 px-5 pb-5 pt-4">
+                                            {purchase.description ? (
+                                                <p className="mb-4 max-w-3xl text-sm leading-6 text-slate-700">{purchase.description}</p>
+                                            ) : null}
+
+                                            <div className="grid gap-3 md:grid-cols-4">
+                                                {statusSteps.map((step, index) => {
+                                                    const isDone = index <= activeIndex
+                                                    const Icon = step.icon
+                                                    return (
+                                                        <div
+                                                            key={step.status}
+                                                            className={`rounded-2xl border-2 p-3 ${
+                                                                isDone
+                                                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+                                                                    : 'border-slate-300 bg-white text-slate-500'
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-center gap-2">
+                                                                <Icon size={16} />
+                                                                <p className="text-sm font-semibold">{step.label}</p>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+
+                                            <dl className="mt-4 grid gap-3 border-t-2 border-slate-300 pt-4 sm:grid-cols-2 lg:grid-cols-4">
+                                                <PurchaseDetail label="Pyytäjä" value={purchase.requestedBy || '-'} />
+                                                <PurchaseDetail label="PO-numero" value={purchase.orderNumber ?? '-'} />
+                                                <PurchaseDetail label="Odotettu toimitus" value={purchase.expectedDate ? formatFinnishDate(purchase.expectedDate) : '-'} />
+                                                <PurchaseDetail label="Vastaanotettu" value={purchase.receivedDate ? formatFinnishDate(purchase.receivedDate) : '-'} />
+                                                <PurchaseDetail label="Laskuviite" value={purchase.invoiceReference ?? '-'} />
+                                            </dl>
+
+                                            <div className="mt-4 flex flex-wrap justify-end gap-2">
+                                                {purchase.invoiceAttachmentDataUrl ? (
+                                                    <a
+                                                        href={purchase.invoiceAttachmentDataUrl}
+                                                        download={purchase.invoiceAttachmentName ?? 'ostolasku'}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                                                    >
+                                                        <Paperclip size={15} />
+                                                        Avaa lasku
+                                                    </a>
+                                                ) : null}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openInvoiceModal(purchase, false)}
+                                                    disabled={isBusy}
+                                                    className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
+                                                >
+                                                    <Paperclip size={15} />
+                                                    {purchase.invoiceAttachmentDataUrl ? 'Vaihda lasku' : 'Liitä lasku'}
+                                                </button>
+                                                {nextStatus ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => void advancePurchase(purchase)}
+                                                        disabled={isBusy}
+                                                        className="rounded-xl border-2 border-emerald-400 bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-200 disabled:cursor-wait disabled:opacity-60"
+                                                    >
+                                                        {isBusy ? 'Tallennetaan...' : `Siirrä tilaan: ${statusLabels[nextStatus]}`}
+                                                    </button>
+                                                ) : null}
+                                                {!isPaid ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openEditModal(purchase)}
+                                                        disabled={isBusy}
+                                                        className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
+                                                    >
+                                                        <Pencil size={15} />
+                                                        Muokkaa
+                                                    </button>
+                                                ) : null}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => void deletePurchase(purchase.id)}
+                                                    disabled={isBusy}
+                                                    className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-wait disabled:opacity-60"
+                                                >
+                                                    <Trash2 size={15} />
+                                                    Poista
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : null}
+                                </article>
+                            )
+                        })
+                    )}
+                </div>
+            )}
+
+            {editingPurchase ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+                    <form
+                        onSubmit={handleEditSave}
+                        className="w-full max-w-lg rounded-2xl border-2 border-slate-400 bg-white p-6 shadow-2xl"
+                    >
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border-2 border-slate-300 bg-slate-50">
+                                    <Pencil size={18} className="text-slate-600" />
                                 </div>
-                            </article>
-                        )
-                    })
-                )}
-            </div>
+                                <h3 className="text-lg font-semibold text-slate-950">Muokkaa hankintaa</h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={closeEditModal}
+                                disabled={isEditSaving}
+                                className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="mt-5 grid gap-4 md:grid-cols-2">
+                            <FormInput label="Toimittaja *" value={editForm.supplierName} onChange={(v) => updateEditFormField('supplierName', v)} disabled={isEditSaving} />
+                            <FormInput label="Hankinta *" value={editForm.title} onChange={(v) => updateEditFormField('title', v)} disabled={isEditSaving} />
+                            <FormInput label="Pyytäjä" value={editForm.requestedBy} onChange={(v) => updateEditFormField('requestedBy', v)} disabled={isEditSaving} />
+                            <FormInput label="PO-numero" value={editForm.orderNumber} onChange={(v) => updateEditFormField('orderNumber', v)} disabled={isEditSaving} />
+                            <FormInput label="Arvioitu summa" value={editForm.amount} onChange={(v) => updateEditFormField('amount', v)} disabled={isEditSaving} inputMode="decimal" />
+                            <FormInput label="Odotettu toimitus" value={editForm.expectedDate} onChange={(v) => updateEditFormField('expectedDate', v)} disabled={isEditSaving} type="date" />
+                            <label className="block md:col-span-2">
+                                <span className="mb-1 block text-sm font-medium text-slate-700">Kuvaus</span>
+                                <textarea
+                                    value={editForm.description}
+                                    onChange={(e) => updateEditFormField('description', e.target.value)}
+                                    disabled={isEditSaving}
+                                    rows={3}
+                                    className="w-full rounded-xl border-2 border-slate-400 bg-white px-4 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                />
+                            </label>
+                        </div>
+
+                        {editFormError ? (
+                            <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">{editFormError}</p>
+                        ) : null}
+
+                        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                            <button
+                                type="button"
+                                onClick={closeEditModal}
+                                disabled={isEditSaving}
+                                className="rounded-xl border-2 border-slate-400 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
+                            >
+                                Peruuta
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isEditSaving}
+                                className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-emerald-500 bg-emerald-400 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-wait disabled:opacity-60"
+                            >
+                                <Check size={16} />
+                                {isEditSaving ? 'Tallennetaan...' : 'Tallenna muutokset'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            ) : null}
 
             {invoiceModalPurchase ? (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
